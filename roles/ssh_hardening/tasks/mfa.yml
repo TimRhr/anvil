@@ -75,7 +75,7 @@
   ansible.builtin.copy:
     dest: /etc/users.oath
     content: |
-      # {{ ansible_managed }}
+      # Anvil-managed — Secrets werden NICHT überschrieben (force:false).
       # OATH/TOTP-Secrets je Admin-User (vendor-neutral, RFC 6238).
       # Format:  HOTP/T30/6  <user>  -  <HEX-SECRET>
       # Enrollment: HEX="$(head -c 20 /dev/urandom | xxd -p -c40)"; \

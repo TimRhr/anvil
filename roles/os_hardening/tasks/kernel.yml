@@ -23,7 +23,7 @@
     group: root
     mode: "0644"
     content: |
-      # {{ ansible_managed }}
+      # Anvil-managed — automatisch erzeugt, nicht manuell editieren.
       # Kernel Lockdown LSM (gesetzt via kernel_lockdown Variable)
       GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT lockdown={{ kernel_lockdown }}"
   when:
