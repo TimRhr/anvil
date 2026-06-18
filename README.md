@@ -93,6 +93,8 @@ Feature-Toggles stehen in [group_vars/all/main.yml](group_vars/all/main.yml) und
 - [docs/runbook.md](docs/runbook.md) — Betrieb, Recovery, Aussperr-Wiederherstellung, Kernel-Fallback
 - [docs/compliance-matrix.md](docs/compliance-matrix.md) — BSI ↔ CIS ↔ Anvil-Maßnahmen
 - [docs/threat-model.md](docs/threat-model.md) — Annahmen, Scope, bewusste Grenzen
+- [docs/security-audit.md](docs/security-audit.md) — Sicherheitsaudit der Baseline (Befunde + Schweregrade)
+- [ROADMAP.md](ROADMAP.md) — Weg zu Kronjuwelen-Härtung & wiederholbarem App-Schichten-Modell
 
 ---
 
