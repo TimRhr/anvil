@@ -22,6 +22,17 @@
     path: /dev/watchdog
   register: anvil_watchdog_dev
 
+- name: "Kernel | system.conf.d-Verzeichnis sicherstellen"
+  ansible.builtin.file:
+    path: /etc/systemd/system.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - enable_watchdog | bool
+    - anvil_watchdog_dev.stat.exists
+
 - name: "Kernel | systemd-Watchdog konfigurieren (falls /dev/watchdog vorhanden)"
   ansible.builtin.template:
     src: watchdog.conf.j2
@@ -44,6 +55,14 @@
     - not anvil_watchdog_dev.stat.exists
 
 # --- (2) GRUB headless-robust -------------------------------------------------
+- name: "Kernel | grub.d-Verzeichnis sicherstellen"
+  ansible.builtin.file:
+    path: /etc/default/grub.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
 - name: "Kernel | GRUB-Drop-in (saved default + RECORDFAIL-Timeout)"
   ansible.builtin.template:
     src: grub-anvil.cfg.j2

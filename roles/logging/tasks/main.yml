@@ -14,6 +14,15 @@
   when: logging_journald_persistent | bool
   tags: [logging]
 
+- name: "Logging | journald-Drop-in-Verzeichnis sicherstellen"
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [logging]
+
 - name: "Logging | journald-Drop-in (persistent + Retention)"
   ansible.builtin.template:
     src: journald-anvil.conf.j2
