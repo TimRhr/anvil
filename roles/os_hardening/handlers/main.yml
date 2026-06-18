@@ -10,9 +10,17 @@
   changed_when: false
   when: not ansible_check_mode
 
-- name: Load audit rules
+- name: Load audit rules  # noqa: command-instead-of-module
+  # augenrules --load gibt bei "No change" rc=1 zurück (kein echter Fehler);
+  # im crown-Modus sperrt zudem -e 2 (immutable) weiteres Laden bis zum Reboot.
+  # Beides ist gutartig und darf den Lauf nicht abbrechen.
   ansible.builtin.command: augenrules --load
-  changed_when: false
+  register: anvil_augenrules
+  changed_when: "'No change' not in (anvil_augenrules.stdout | default('No change'))"
+  failed_when:
+    - anvil_augenrules.rc != 0
+    - "'No change' not in (anvil_augenrules.stdout | default(''))"
+    - "'unable to set' not in (anvil_augenrules.stderr | default('') | lower)"
   when: not ansible_check_mode
 
 - name: Restart fail2ban
