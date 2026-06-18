@@ -194,13 +194,17 @@ cmd_vm_matrix() {
   local_guard
   section "Matrix auf $(hostname) — alle Presets nacheinander"
   # crown-totp-enrolled bewusst NICHT dabei (würde SSH ohne Secret sperren -> totp-test).
-  local order="baseline minimal full crown crown-totp crown-egress"
-  local p f results="" failed=0
-  for p in $order; do
-    f="$PRESET_DIR/$p.yml"; [[ -f "$f" ]] || continue
+  # Array statt String: IFS=$'\n\t' splittet NICHT auf Leerzeichen!
+  local order=(baseline minimal full crown crown-totp crown-egress)
+  local p f results="" failed=0 applied=0
+  for p in "${order[@]}"; do
+    f="$PRESET_DIR/$p.yml"
+    [[ -f "$f" ]] || { warn "Preset $p fehlt — übersprungen."; continue; }
+    applied=$((applied + 1))
     if local_apply "$f"; then results+="  ✓ $p\n"; ok "$p: PASS"
     else results+="  ✗ $p\n"; failed=1; warn "$p: FAIL"; fi
   done
+  [[ "$applied" -gt 0 ]] || die "Kein Preset angewendet — interner Fehler (Iteration leer)."
   section "Matrix-Ergebnis"
   printf '%b' "$results" >&2
   if [[ "$failed" -eq 0 ]]; then ok "Matrix: ALLE PRESETS PASS"; else die "Matrix: es gab Fehlschläge."; fi
