@@ -19,7 +19,7 @@
   pre_tasks:
     - name: "Anvil | Startzeitpunkt festhalten"
       ansible.builtin.set_fact:
-        anvil_run_started: "{{ ansible_date_time.iso8601 }}"
+        anvil_run_started: "{{ ansible_facts['date_time'].iso8601 }}"
       tags: [always]
 
   roles:

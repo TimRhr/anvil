@@ -8,16 +8,16 @@
 
 - name: "Preflight | Als root/sudo ausgeführt?"
   ansible.builtin.assert:
-    that: "ansible_user_id == 'root' or ansible_become | default(false)"
+    that: "ansible_facts['user_id'] == 'root'"
     fail_msg: "Anvil muss mit root-Rechten laufen (sudo)."
     quiet: true
   tags: [always]
 
 - name: "Preflight | Unterstütztes Betriebssystem?"
   ansible.builtin.assert:
-    that: "ansible_os_family == 'Debian'"
-    fail_msg: "Nicht unterstützt: {{ ansible_distribution }} {{ ansible_distribution_version }} — Anvil benötigt Debian/Ubuntu."
-    success_msg: "OS ok: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+    that: "ansible_facts['os_family'] == 'Debian'"
+    fail_msg: "Nicht unterstützt: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }} — Anvil benötigt Debian/Ubuntu."
+    success_msg: "OS ok: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
     quiet: true
   tags: [always]
 
@@ -74,7 +74,7 @@
 # --- Config-Backup ------------------------------------------------------------
 - name: "Preflight | Backup-Zeitstempel festlegen"
   ansible.builtin.set_fact:
-    anvil_backup_set: "{{ anvil_backup_dir }}/{{ ansible_date_time.iso8601_basic_short }}"
+    anvil_backup_set: "{{ anvil_backup_dir }}/{{ ansible_facts['date_time'].iso8601_basic_short }}"
   tags: [always]
 
 - name: "Preflight | Bestehende Konfiguration sichern -> {{ anvil_backup_set }}"

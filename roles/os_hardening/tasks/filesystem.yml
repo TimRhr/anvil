@@ -13,7 +13,7 @@
 # (sonst würde ein Remount von / nötig — zu riskant, daher übersprungen).
 - name: "FS | Vorhandene eigene Mounts für /tmp und /var/tmp ermitteln"
   ansible.builtin.set_fact:
-    anvil_tmp_mounts: "{{ ansible_mounts | selectattr('mount', 'in', ['/tmp', '/var/tmp']) | list }}"
+    anvil_tmp_mounts: "{{ ansible_facts['mounts'] | selectattr('mount', 'in', ['/tmp', '/var/tmp']) | list }}"
 
 - name: "FS | /tmp und /var/tmp mit nodev,nosuid,noexec härten"
   ansible.posix.mount:
@@ -34,4 +34,4 @@
     msg: >-
       /tmp ist kein eigener Mountpoint — nodev/nosuid/noexec wurde übersprungen.
       Empfehlung: eigene Partition oder tmp.mount (siehe docs/runbook.md).
-  when: "'/tmp' not in (ansible_mounts | map(attribute='mount') | list)"
+  when: "'/tmp' not in (ansible_facts['mounts'] | map(attribute='mount') | list)"

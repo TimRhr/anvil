@@ -35,8 +35,8 @@
     remote_src: true
     mode: "0640"
   loop:
-    - { src: /var/log/lynis.log, dest: "lynis-{{ ansible_date_time.date }}.log" }
-    - { src: /var/log/lynis-report.dat, dest: "lynis-report-{{ ansible_date_time.date }}.dat" }
+    - { src: /var/log/lynis.log, dest: "lynis-{{ ansible_facts['date_time'].date }}.log" }
+    - { src: /var/log/lynis-report.dat, dest: "lynis-report-{{ ansible_facts['date_time'].date }}.dat" }
   failed_when: false
   when: not ansible_check_mode
   tags: [audit]
