@@ -39,6 +39,8 @@ BEFEHLE:
   check <preset>           Dry-Run (--check --diff) lokal (sudo nötig, KEINE Änderungen)
   apply <preset> <vm>      Preset in multipass-VM <vm> anwenden (+ Idempotenz-Check)
   matrix                   lint + 'vars' für ALLE Presets (schnelle Gesamtprüfung)
+  vm-matrix <vm>           ALLE Presets nacheinander in VM <vm> anwenden (+ Idempotenz)
+  totp-test <vm>           End-to-End-TOTP-Test (pam_oath) in VM <vm> (pamtester)
   vm-up <vm> [release]     multipass-VM erstellen (release: 24.04 | 26.04, Default 24.04)
   vm-rm <vm>               multipass-VM löschen
   -h | --help              Diese Hilfe
@@ -138,41 +140,114 @@ cmd_vm_rm() {
   ok "VM '$vm' gelöscht."
 }
 
-cmd_apply() {
-  local f vm preset
-  f="$(preset_file "${1:-}")"; preset="$(basename "$f" .yml)"
-  vm="${2:-}"
-  [[ -n "$vm" ]] || die "apply benötigt eine VM: dev/dev.sh apply $preset <vm>  (Sicherheit: kein localhost!)"
+_vm_require() {
+  local vm="$1"
   require_cmd multipass || die "multipass nicht installiert."
   multipass info "$vm" >/dev/null 2>&1 || die "VM '$vm' existiert nicht. Erst: dev/dev.sh vm-up $vm"
+}
 
-  section "Apply Preset '$preset' in VM '$vm'"
-  local tgz=/tmp/anvil-dev.tgz
-  log "Repo paketieren (ohne .git/collections/dev/.venv) …"
+# Repo in die VM kopieren, entpacken, Ansible sicherstellen.
+_vm_push_repo() {
+  local vm="$1" tgz=/tmp/anvil-dev.tgz
+  log "Repo paketieren & nach '$vm' kopieren …"
   tar czf "$tgz" -C "$REPO_ROOT" \
     --exclude='./.git' --exclude='./collections' --exclude='./dev/.venv' \
     --exclude='./dev/.ansible-home' .
   run multipass transfer "$tgz" "$vm:/tmp/anvil-dev.tgz"
-  run multipass transfer "$f" "$vm:/tmp/anvil-preset.yml"
-
-  log "In der VM ausrollen …"
-  # Single quotes gewollt: Variablen werden von der REMOTE-Shell expandiert.
   # shellcheck disable=SC2016
   multipass exec "$vm" -- sudo bash -euo pipefail -c '
     rm -rf /opt/anvil && mkdir -p /opt/anvil
     tar xzf /tmp/anvil-dev.tgz -C /opt/anvil
     command -v ansible-playbook >/dev/null 2>&1 || { export DEBIAN_FRONTEND=noninteractive; apt-get update -q && apt-get install -y --no-install-recommends ansible; }
+  '
+}
+
+# Preset in der VM anwenden (Lauf A + B) und Idempotenz prüfen. Returnt 0/1.
+_vm_apply() {
+  local vm="$1" f="$2" preset; preset="$(basename "$f" .yml)"
+  run multipass transfer "$f" "$vm:/tmp/anvil-preset.yml"
+  # shellcheck disable=SC2016
+  multipass exec "$vm" -- sudo bash -euo pipefail -c '
     cd /opt/anvil
-    echo "=== Lauf A (Konvergenz) ==="
+    echo "=== '"$preset"': Lauf A (Konvergenz) ==="
     ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventory.ini site.yml -e @/tmp/anvil-preset.yml
-    echo "=== Lauf B (Idempotenz) ==="
+    echo "=== '"$preset"': Lauf B (Idempotenz) ==="
     ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventory.ini site.yml -e @/tmp/anvil-preset.yml | tee /tmp/anvil-runB.log
     rl="$(grep -E "ok=[0-9]+.*changed=[0-9]+" /tmp/anvil-runB.log | tail -n1)"
     ch="$(echo "$rl" | grep -oP "changed=\K[0-9]+")"; fa="$(echo "$rl" | grep -oP "failed=\K[0-9]+")"
-    echo "Idempotenz: changed=$ch failed=$fa"
-    [ "${ch:-1}" = "0" ] && [ "${fa:-1}" = "0" ] && echo "IDEMPOTENZ: PASS" || { echo "IDEMPOTENZ: FAIL"; exit 1; }
+    echo "Idempotenz: changed=${ch:-?} failed=${fa:-?}"
+    [ "${ch:-1}" = "0" ] && [ "${fa:-1}" = "0" ]
   '
-  ok "Apply + Idempotenz in '$vm' abgeschlossen (Preset $preset). Zugang: multipass shell $vm"
+}
+
+cmd_apply() {
+  local f vm preset
+  f="$(preset_file "${1:-}")"; preset="$(basename "$f" .yml)"; vm="${2:-}"
+  [[ -n "$vm" ]] || die "apply benötigt eine VM: dev/dev.sh apply $preset <vm>  (Sicherheit: kein localhost!)"
+  _vm_require "$vm"
+  section "Apply Preset '$preset' in VM '$vm'"
+  _vm_push_repo "$vm"
+  if _vm_apply "$vm" "$f"; then
+    ok "Apply + Idempotenz PASS (Preset $preset, VM $vm). Zugang: multipass shell $vm"
+  else
+    die "Apply/Idempotenz FAIL (Preset $preset, VM $vm)."
+  fi
+}
+
+# Alle Presets nacheinander in EINER VM (Transitions-Smoke-Test).
+cmd_vm_matrix() {
+  local vm="${1:-}"
+  [[ -n "$vm" ]] || die "vm-matrix benötigt eine VM: dev/dev.sh vm-matrix <vm>"
+  _vm_require "$vm"
+  section "VM-Matrix in '$vm' — alle Presets nacheinander"
+  _vm_push_repo "$vm"
+  # crown-totp-enrolled bewusst NICHT in der Matrix (würde SSH ohne Secret sperren).
+  local order="baseline minimal full crown crown-totp crown-egress"
+  local p f results="" failed=0
+  for p in $order; do
+    f="$PRESET_DIR/$p.yml"; [[ -f "$f" ]] || continue
+    section "Matrix: Preset $p"
+    if _vm_apply "$vm" "$f"; then results+="  ✓ $p\n"; ok "$p: PASS"
+    else results+="  ✗ $p\n"; failed=1; warn "$p: FAIL"; fi
+  done
+  section "Matrix-Ergebnis"
+  printf '%b' "$results" >&2
+  if [[ "$failed" -eq 0 ]]; then ok "VM-Matrix: ALLE PRESETS PASS"; else die "VM-Matrix: es gab Fehlschläge (siehe oben)."; fi
+}
+
+# End-to-End-TOTP-Test (pam_oath) in einer VM: Test-Secret anlegen, enforced
+# anwenden, PAM-Stack prüfen und mit pamtester echten OTP validieren.
+cmd_totp_test() {
+  local vm="${1:-}"
+  [[ -n "$vm" ]] || die "totp-test benötigt eine VM: dev/dev.sh totp-test <vm>"
+  _vm_require "$vm"
+  local f="$PRESET_DIR/crown-totp-enrolled.yml"
+  [[ -f "$f" ]] || die "Preset crown-totp-enrolled fehlt."
+  section "End-to-End TOTP-Test (pam_oath) in VM '$vm'"
+  _vm_push_repo "$vm"
+  run multipass transfer "$f" "$vm:/tmp/anvil-preset.yml"
+  # shellcheck disable=SC2016
+  multipass exec "$vm" -- sudo bash -euo pipefail -c '
+    HEX="3132333435363738393031323334353637383930"   # 20-Byte Test-Secret (hex)
+    printf "HOTP/T30/6 devadmin - %s\n" "$HEX" > /etc/users.oath
+    chmod 600 /etc/users.oath
+    cd /opt/anvil
+    echo "=== Apply crown-totp-enrolled (TOTP ENFORCED) ==="
+    ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventory.ini site.yml -e @/tmp/anvil-preset.yml
+    echo "=== Konfig-Prüfung ==="
+    grep -q "pam_oath.so" /etc/pam.d/sshd && echo "OK: pam_oath im sshd-PAM" || { echo "FAIL: pam_oath fehlt"; exit 1; }
+    grep -qE "^#@include common-auth" /etc/pam.d/sshd && echo "OK: common-auth deaktiviert" || { echo "FAIL: common-auth noch aktiv"; exit 1; }
+    grep -q "publickey,keyboard-interactive" /etc/ssh/sshd_config.d/00-anvil-hardening.conf && echo "OK: AuthenticationMethods publickey,keyboard-interactive" || { echo "FAIL: AuthenticationMethods falsch"; exit 1; }
+    echo "=== End-to-End PAM-Test (pamtester) ==="
+    export DEBIAN_FRONTEND=noninteractive
+    command -v pamtester >/dev/null 2>&1 && command -v oathtool >/dev/null 2>&1 || { apt-get update -q && apt-get install -y pamtester oathtool >/dev/null; }
+    OTP="$(oathtool --totp "$HEX")"
+    echo "korrekter OTP=$OTP"
+    if echo "$OTP" | pamtester sshd devadmin authenticate; then echo "PASS: korrekter OTP akzeptiert"; else echo "FAIL: korrekter OTP abgelehnt"; exit 1; fi
+    if echo "000000" | pamtester sshd devadmin authenticate 2>/dev/null; then echo "FAIL: falscher OTP akzeptiert"; exit 1; else echo "PASS: falscher OTP abgelehnt"; fi
+    echo "TOTP-END-TO-END: PASS"
+  '
+  ok "TOTP end-to-end PASS in '$vm' (Test-Secret in /etc/users.oath). Zugang: multipass shell $vm"
 }
 
 cmd_matrix() {
@@ -194,6 +269,8 @@ main() {
     check)       cmd_check "${1:-}" ;;
     apply)       cmd_apply "${1:-}" "${2:-}" ;;
     matrix)      cmd_matrix ;;
+    vm-matrix)   cmd_vm_matrix "${1:-}" ;;
+    totp-test)   cmd_totp_test "${1:-}" ;;
     vm-up)       cmd_vm_up "${1:-}" "${2:-}" ;;
     vm-rm)       cmd_vm_rm "${1:-}" ;;
     -h|--help|"") usage ;;

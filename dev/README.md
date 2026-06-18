@@ -23,7 +23,9 @@ dev/dev.sh check crown           # lokaler Dry-Run (--check, KEINE Änderungen; 
 
 # Voller Apply-Test nur in einer Wegwerf-VM (nie localhost):
 dev/dev.sh vm-up anvil-dev 24.04
-dev/dev.sh apply crown anvil-dev # Apply + automatischer Idempotenz-Check in der VM
+dev/dev.sh apply crown anvil-dev   # Apply + automatischer Idempotenz-Check in der VM
+dev/dev.sh vm-matrix anvil-dev     # ALLE Presets nacheinander (Idempotenz je Preset)
+dev/dev.sh totp-test anvil-dev     # End-to-End-TOTP-Test (pam_oath) via pamtester
 dev/dev.sh vm-rm anvil-dev
 ```
 
@@ -36,7 +38,17 @@ dev/dev.sh vm-rm anvil-dev
 | `full` | baseline | alle Maßnahmen inkl. Forensik |
 | `crown` | crown_jewels | MFA=auto (FIDO2; ohne sk-Key kein Enforce) |
 | `crown-totp` | crown_jewels | TOTP via pam_oath (staged, kein Enforce) |
+| `crown-totp-enrolled` | crown_jewels | TOTP **enforced** — nur via `totp-test` nutzen (legt Test-Secret an) |
 | `crown-egress` | crown_jewels | Egress-Firewall aktiv (deny outgoing) |
+
+### End-to-End-TOTP-Test
+
+`dev/dev.sh totp-test <vm>` legt ein deterministisches Test-Secret in
+`/etc/users.oath` an, wendet `crown-totp-enrolled` an und prüft den PAM-Stack
+**wirklich** durch: `pamtester sshd devadmin authenticate` mit einem von
+`oathtool` erzeugten gültigen OTP (muss bestehen) und einem falschen OTP (muss
+abgelehnt werden). Belegt, dass pam_oath + die common-auth-Deaktivierung
+korrekt greifen — ohne echte SSH-Sitzung und ohne Lockout-Risiko.
 
 Eigenes Szenario: eine Datei nach `dev/presets/<name>.yml` legen (Extra-Vars,
 mind. `admin_user` + `admin_pubkeys` + `anvil_posture`).

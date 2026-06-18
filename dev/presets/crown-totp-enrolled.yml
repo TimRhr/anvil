@@ -1,0 +1,15 @@
+---
+# dev-Preset: crown_jewels mit TOTP (pam_oath) ENFORCED (ssh_totp_enrolled=true).
+# ACHTUNG: erzwingt TOTP -> ohne Secret in /etc/users.oath für admin_user wäre
+# SSH-Login unmöglich. Daher NICHT via 'apply' nutzen, sondern via:
+#     dev/dev.sh totp-test <vm>
+# Das legt ein Test-Secret an und prüft den PAM-Stack end-to-end (pamtester).
+admin_user: devadmin
+admin_pubkeys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDdEvDevDevDevDevDevDevDevDevDevDevDevDevDev00 dev@anvil"
+anvil_posture: crown_jewels
+ssh_mfa_method: totp
+ssh_totp_enrolled: true
+notify_enabled: false
+vault_gotify_url: ""
+vault_gotify_token: ""
