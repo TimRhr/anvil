@@ -11,11 +11,209 @@ echo "DEIN-VAULT-PASSWORT" > .vault_pass && chmod 600 .vault_pass   # optional
 sudo ./bootstrap.sh --check                         # Dry-Run
 sudo ./bootstrap.sh apply                           # Härtung
 ```
-
 **Vor dem ersten produktiven Lauf:** in einer Wegwerf-VM testen und während des
 ersten Laufs eine **zweite SSH-Sitzung offen halten**.
 
 ---
+
+## Provisionierung mit multipass (24.04 & 26.04)
+
+### VM starten
+
+```bash
+# Ubuntu 24.04
+multipass launch 24.04 --name anvil-2404 --memory 2G --disk 10G
+
+# Ubuntu 26.04
+multipass launch 26.04 --name anvil-2604 --memory 2G --disk 10G
+```
+
+### Anvil in die VM bringen
+
+```bash
+# Variante A — Transfer vom Host (Repo lokal geklont):
+multipass transfer -r /opt/anvil anvil-2404:/opt/anvil
+
+# Variante B — Direkt in der VM klonen (Netzugang vorausgesetzt):
+multipass shell anvil-2404
+# Im Gast:
+sudo mkdir -p /opt && sudo chown ubuntu:ubuntu /opt
+git clone <repo-url> /opt/anvil
+```
+
+### Konfiguration & Vault
+
+```bash
+multipass shell anvil-2404
+cd /opt/anvil
+
+# Config anlegen (Admin-User + eigenen SSH-Public-Key eintragen):
+cp config/anvil.conf.example config/anvil.conf
+$EDITOR config/anvil.conf
+
+# Vault anlegen und verschlüsseln:
+cp group_vars/all/vault.example.yml group_vars/all/vault.yml
+ansible-vault encrypt group_vars/all/vault.yml      # Passwort vergeben
+echo "MEIN-VAULT-PASSWORT" > .vault_pass && chmod 600 .vault_pass
+```
+
+> **SSH-Key in die VM bekommen:** entweder via `multipass transfer ~/.ssh/id_ed25519.pub anvil-2404:` (dann in der VM in `config/anvil.conf` eintragen), oder direkt in der Shell per `echo … >> config/anvil.conf`.
+
+### Ausführen
+
+```bash
+sudo ./bootstrap.sh --check     # Dry-Run — zeigt Änderungen, ändert nichts
+sudo ./bootstrap.sh apply       # Härtung anwenden
+```
+
+### Login verifizieren
+
+```bash
+# Vom Host aus:
+ssh -i ~/.ssh/<dein-key> -p <port> <admin-user>@<vm-ip>
+
+# VM-IP ermitteln:
+multipass info anvil-2404 | grep IPv4
+```
+
+---
+
+## Verifizierung (Idempotenz & Kernel-Fallback)
+
+Nach erfolgreicher Provisionierung kann der gehärtete Zustand mit zwei Skripten geprüft werden.
+
+### Idempotenz-Check
+
+[`tests/provision-check.sh`](../tests/provision-check.sh) führt `bootstrap.sh apply` zweimal aus und prüft, dass der zweite Lauf **changed=0** und **failed=0** meldet.
+
+```bash
+# In der provisionierten VM:
+cd /opt/anvil
+sudo tests/provision-check.sh
+```
+
+**Erwartet:** `PASS — Der zweite Apply-Lauf hat nichts verändert.`
+
+Schlägt der Test fehl, mit `-v` wiederholen, um die nicht-idempotenten Tasks zu identifizieren:
+```bash
+sudo ./bootstrap.sh apply -v 2>&1 | grep -E '(changed|failed)'
+```
+
+### Kernel-Fallback-Assessment
+
+[`tests/fallback-check.sh`](../tests/fallback-check.sh) testet die Logik von `anvil-boot-assess` **ohne echten Reboot**, non-destruktiv:
+
+```bash
+# In der provisionierten VM:
+cd /opt/anvil
+sudo tests/fallback-check.sh
+```
+
+Geprüft werden drei Pfade:
+1. **Fallback-Pfad:** Bogus-Kernel → `last-fallback` geschrieben, `intended-kernel` entfernt, Gotify-Eintrag im Log.
+2. **Erfolgs-Pfad:** `intended-kernel == uname -r` → laufender Kernel als GRUB-Default, `intended-kernel` entfernt.
+3. **Normaler Boot:** Kein `intended-kernel` → `saved_entry` gesetzt, kein Fallback.
+
+**Erwartet:** `PASS — Alle Kernel-Fallback-Prüfungen bestanden.`
+
+---
+
+## Echter Kernel-Fallback-Test (manuell)
+
+Dieser Test bootet die VM neu und prüft den realen Fallback-Mechanismus. **Nur in einer Test-VM durchführen.**
+
+### Vorbereitung
+
+```bash
+# 1. Sicherstellen, dass mindestens 2 Kernel installiert sind:
+dpkg -l 'linux-image-*' | grep '^ii' | wc -l     # sollte ≥ 2 sein
+
+# 2. Aktuelle Boot-Reihenfolge notieren:
+grub-editenv /boot/grub/grubenv list
+```
+
+### Defekten Kernel simulieren
+
+Den neuen (neuesten) One-shot-Kernel künstlich „defekt" machen:
+
+```bash
+# Neueste Kernel-Version ermitteln und initrd manipulieren:
+newest=$(ls -1 /boot/vmlinuz-* | sed 's#.*/vmlinuz-##' | sort -V | tail -n1)
+sudo mv /boot/initrd.img-"$newest" /boot/initrd.img-"$newest".bak
+
+# Oder: Boot-Parameter manipulieren, die zum Panic führen:
+# sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/&panic=-1 /' /etc/default/grub.d/99-anvil.cfg
+# Achtung: obiger Eingriff erfordert update-grub und ist nicht idempotent!
+```
+
+### Reboot & Fallback auslösen
+
+```bash
+# One-shot auf neuen Kernel setzen + reboot:
+sudo /opt/anvil/bootstrap.sh --reboot-if-needed
+
+# Oder direkt (wenn bootstrap.sh nicht verfügbar):
+sudo anvil-prepare-kernel-reboot
+```
+
+Die VM startet automatisch neu. Nach dem Boot:
+
+```bash
+# Prüfen, ob der Fallback eingeleitet wurde:
+cat /var/lib/anvil/last-fallback          # zeigt: defekte Version -> aktuelle Version
+
+# Gotify-Alarm prüfen:
+grep -i 'fallback\|kernel' /var/log/anvil/notify.log
+
+# Gesperrten Kernel anzeigen:
+apt-mark showhold
+```
+
+**Erwartet:** VM bootet den alten (Known-Good) Kernel, `last-fallback` existiert, Gotify-Alarm mit `⚠️ Kernel-Fallback aktiv` ist im Log.
+
+### Wiederherstellen
+
+```bash
+# Gesperrten Kernel freigeben (Versionsnummer aus last-fallback):
+sudo apt-mark unhold linux-image-<defekte-version>
+
+# Kaputte initrd wiederherstellen:
+sudo mv /boot/initrd.img-<version>.bak /boot/initrd.img-<version>
+
+# Erneuten Versuch starten:
+sudo anvil-prepare-kernel-reboot
+```
+
+---
+
+## Distributionsspezifika Ubuntu 26.04
+
+Ubuntu 26.04 bringt einige Änderungen gegenüber 24.04, die beim Provisioning mit Anvil bereits berücksichtigt wurden. Hier eine Übersicht als Checkliste bei der Verifizierung.
+
+### sudo-rs
+
+Ubuntu 26.04 liefert **sudo-rs** (Rust-Implementierung) statt des klassischen sudo. Alle Anvil-Templates und Tasks sind damit kompatibel. Hintergrund:
+- Anvil schreibt `/etc/sudoers.d/<user>` als per `visudo -cf` validiertes Template ([roles/base_user/templates/sudoers.j2](../roles/base_user/templates/sudoers.j2)) und setzt nur sudo-rs-kompatible Defaults (`timestamp_timeout`) — kein `timestamp_type`/`logfile`.
+- `sudo -i` und `sudo -s` verhalten sich identisch.
+
+### Fehlende/ersetzte Pakete
+
+| Komponente | 24.04 | 26.04 | Status |
+|---|---|---|---|
+| sudo | sudo (C) | sudo-rs (Rust) | ✅ kompatibel (sudoers nur mit `timestamp_timeout`) |
+| coreutils | GNU coreutils | ggf. uutils-coreutils (Rust) | ◐ kompatibel, nicht gesondert verifiziert |
+| `community.general.yaml`-Callback | enthalten | entfernt | ✅ `ansible.cfg` nutzt `stdout_callback = default` + `result_format = yaml` |
+| Deprecation-Noise | gering | erhöht (Collection-Deprecations) | ✅ via `deprecation_warnings = False` in `ansible.cfg` unterdrückt |
+
+### Drop-in-Verzeichnisse
+
+- `systemd/journald.conf.d/` existiert auf 26.04 von Haus aus — die `file`-Task in der logging-Rolle ist dennoch idempotent.
+- `/etc/default/grub.d/` ebenfalls vorhanden — die kernel_resilience-Rolle legt es defensiv selbst an.
+
+### Collection-Kompatibilität
+
+Die in `requirements.yml` festgeschriebenen Collection-Versionen sind auf beiden Versionen getestet. Sollte eine Collection auf 26.04 fehlen, installiert `bootstrap.sh` sie automatisch aus `requirements.yml` nach.
+
 
 ## Aussperr-Wiederherstellung (SSH)
 

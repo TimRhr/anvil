@@ -82,8 +82,29 @@ detect_os() {
 
 assert_supported_os() {
   detect_os
+
+  # Offiziell getestete Versionen pro Distribution.
+  local -A tested_versions
+  tested_versions[ubuntu]="20.04 22.04 24.04 26.04"
+  tested_versions[debian]="11 12"
+
   case "$ANVIL_OS_ID" in
-    debian|ubuntu) ok "Erkanntes OS: ${PRETTY_NAME:-$ANVIL_OS_ID $ANVIL_OS_VERSION_ID}" ;;
+    debian|ubuntu)
+      local versions="${tested_versions[$ANVIL_OS_ID]:-}"
+      local found=false
+      local v
+      for v in $versions; do
+        if [[ "$ANVIL_OS_VERSION_ID" == "$v" ]]; then
+          found=true
+          break
+        fi
+      done
+      if $found; then
+        ok "Erkanntes OS: ${PRETTY_NAME:-$ANVIL_OS_ID $ANVIL_OS_VERSION_ID} — getestet."
+      else
+        warn "OS '${PRETTY_NAME:-$ANVIL_OS_ID $ANVIL_OS_VERSION_ID}' nicht offiziell getestet (erwartet: $versions). Fahre trotzdem fort — bitte vor Produktivbetrieb verifizieren."
+      fi
+      ;;
     *)
       if [[ "$ANVIL_OS_FAMILY" == *debian* ]]; then
         warn "OS '$ANVIL_OS_ID' nicht offiziell getestet, aber Debian-kompatibel — fahre fort."

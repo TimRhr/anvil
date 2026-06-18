@@ -24,16 +24,16 @@ notify (Gotify), audit (Lynis). Lint sauber, idempotent.
 
 ---
 
-## Phase 1 — Verifizierte Provisionierung 24.04 & 26.04 ☐
+## Phase 1 — Verifizierte Provisionierung 24.04 & 26.04 ◐
 
 **Ziel:** reproduzierbarer Weg von der nackten VM zum gehärteten Host auf **beiden**
 Ubuntu-Versionen, getestet.
 
-- ☐ **Erstkontakt/Entry**: cloud-init-Snippet + `firstboot`-Doku (git clone → `bootstrap.sh apply`); optional minimaler einzeiliger Installer (`curl … | bash` nur mit Pin/Prüfsumme, siehe SC-1).
-- ☐ **OS-Matrix absichern**: Provisioning auf 24.04 **und** 26.04 durchspielen; bekannte 26.04-Spezifika dokumentieren (sudo-rs, ggf. uutils-coreutils, entfernte community.general-Plugins) — die zugehörigen Fixes sind bereits eingeflossen.
-- ☐ **Idempotenz-Gate**: zweiter `apply`-Lauf = `changed=0` auf beiden Versionen (Test in Phase 6).
-- ☐ **Kernel-Fallback-Abnahme**: in einer VM einen defekten Kernel-One-shot simulieren → Fallback + Gotify-Alarm bestätigen (Runbook-Schritt automatisieren).
-- ☐ **Provisioning-Runbook**: pro Provider (Hetzner/Proxmox/Cloud-init) Kurzanleitung in `docs/runbook.md`.
+- ☑ **Erstkontakt/Entry**: git clone + `bootstrap.sh apply` — dokumentiert in [docs/runbook.md](docs/runbook.md) (multipass-Sektion). Kein One-Line-Installer (→ Phase 4).
+- ☑ **OS-Matrix absichern**: Provisioning auf 24.04 **und** 26.04 durchgespielt; bekannte 26.04-Spezifika in [docs/runbook.md](docs/runbook.md#distributionsspezifika-ubuntu-2604) dokumentiert (sudo-rs, ggf. uutils-coreutils, entfernte community.general-Plugins).
+- ☑ **Idempotenz-Gate**: [`tests/provision-check.sh`](tests/provision-check.sh) prüft `changed=0` im zweiten Lauf. Auf 24.04 und 26.04 ausführbar.
+- ☑ **Kernel-Fallback-Abnahme**: [`tests/fallback-check.sh`](tests/fallback-check.sh) testet Fallback-/Erfolgs-/Normalpfad non-destruktiv. Manueller Reboot-Test in [docs/runbook.md](docs/runbook.md#echter-kernel-fallback-test-manuell).
+- ☑ **Provisioning-Runbook**: multipass-Kurzanleitung in [docs/runbook.md](docs/runbook.md#provisionierung-mit-multipass-2404--2604). Provider-spezifische Runbooks (Hetzner/Proxmox) folgen später.
 
 **Akzeptanz:** je eine 24.04- und 26.04-VM gehen mit einem Befehl von „frisch" zu
 „gehärtet, idempotent, Fallback getestet".

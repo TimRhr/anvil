@@ -81,10 +81,14 @@ Feature-Toggles stehen in [group_vars/all/main.yml](group_vars/all/main.yml) und
 
 ## Voraussetzungen
 
-- Debian 11/12 oder Ubuntu 20.04/22.04/24.04
+- Debian 11/12 oder Ubuntu 20.04/22.04/24.04/26.04
 - root- bzw. sudo-Zugang
 - Netzwerkzugang für die **einmalige** Ansible-Installation (danach läuft alles lokal/offline)
 - Erreichbarer Gotify-Server für Benachrichtigungen (optional, aber empfohlen)
+
+> Ubuntu 24.04 und 26.04 werden aktiv getestet. Debian 11/12 und Ubuntu 20.04/22.04
+> werden als kompatibel geführt, aber nicht regelmäßig in CI geprüft. Siehe
+> [docs/runbook.md](docs/runbook.md#distributionsspezifika-ubuntu-2604) für 26.04-Spezifika.
 
 ---
 
