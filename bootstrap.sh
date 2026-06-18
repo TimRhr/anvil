@@ -24,6 +24,12 @@ readonly CONFIG_FILE="$SCRIPT_DIR/config/anvil.conf"
 readonly PLAYBOOK="$SCRIPT_DIR/site.yml"
 readonly INVENTORY="$SCRIPT_DIR/inventory.ini"
 
+# Temporäre Variablen-Datei (extra-vars). Wird per EXIT-Trap aufgeräumt — robust
+# auch bei Fehlern/`die` und unter `set -u` (kein fragiler RETURN-Trap).
+ANVIL_TMP_VARS=""
+cleanup() { [[ -n "${ANVIL_TMP_VARS:-}" ]] && rm -f "$ANVIL_TMP_VARS"; return 0; }
+trap cleanup EXIT
+
 # --- Standardwerte für Optionen ----------------------------------------------
 MODE="apply"            # apply | rollback | reboot | enable-timer
 CHECK_MODE=false
@@ -167,11 +173,10 @@ do_apply() {
   load_config "$CONFIG_FILE"
   ensure_ansible
 
-  local extra_vars; extra_vars="$(mktemp /tmp/anvil-vars.XXXXXX.json)"
-  trap 'rm -f "$extra_vars"' RETURN
-  build_extra_vars "$extra_vars"
+  ANVIL_TMP_VARS="$(mktemp /tmp/anvil-vars.XXXXXX.json)"
+  build_extra_vars "$ANVIL_TMP_VARS"
 
-  local -a cmd=(ansible-playbook -i "$INVENTORY" "$PLAYBOOK" -e "@$extra_vars")
+  local -a cmd=(ansible-playbook -i "$INVENTORY" "$PLAYBOOK" -e "@$ANVIL_TMP_VARS")
   # Word-Splitting ist hier gewollt: vault_args liefert 0 oder 2 Tokens.
   # shellcheck disable=SC2046,SC2207
   cmd+=($(vault_args "$SCRIPT_DIR"))
