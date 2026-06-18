@@ -37,6 +37,8 @@
   loop:
     - { src: /var/log/lynis.log, dest: "lynis-{{ ansible_facts['date_time'].date }}.log" }
     - { src: /var/log/lynis-report.dat, dest: "lynis-report-{{ ansible_facts['date_time'].date }}.dat" }
+  # Report-Kopie ist keine Konfig-Änderung (Lynis-Logs ändern sich je Lauf) -> idempotent halten.
+  changed_when: false
   failed_when: false
   when: not ansible_check_mode
   tags: [audit]

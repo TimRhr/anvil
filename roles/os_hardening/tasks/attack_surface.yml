@@ -53,7 +53,7 @@
 
 - name: "Attack | Report schreiben"
   ansible.builtin.copy:
-    dest: "{{ anvil_report_dir }}/attack-surface-{{ ansible_facts['date_time'].iso8601_basic_short | default('%Y%m%dT%H%M%S') }}.txt"
+    dest: "{{ anvil_report_dir }}/attack-surface-{{ ansible_facts['date_time'].date | default('unknown') }}.txt"
     owner: root
     group: root
     mode: "0640"
@@ -86,6 +86,9 @@
       {% endif %}
       - firewall_egress_enforce: {{ firewall_egress_enforce }}
       - enable_grub_password: {{ enable_grub_password }}
+  # Report-Erzeugung ist KEINE Konfig-Änderung -> nicht als "changed" werten
+  # (sonst nie idempotent, da Inhalt/Sockets je Lauf variieren).
+  changed_when: false
   when: not ansible_check_mode
   tags: [os, attack_surface]
 
@@ -119,6 +122,6 @@
 
 - name: "Attack | Report-Pfad als Fact setzen"
   ansible.builtin.set_fact:
-    anvil_attack_report: "{{ anvil_report_dir }}/attack-surface-{{ ansible_facts['date_time'].iso8601_basic_short | default('%Y%m%dT%H%M%S') }}.txt"
+    anvil_attack_report: "{{ anvil_report_dir }}/attack-surface-{{ ansible_facts['date_time'].date | default('unknown') }}.txt"
   when: not ansible_check_mode
   tags: [os, attack_surface]

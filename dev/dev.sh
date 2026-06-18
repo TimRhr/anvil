@@ -120,21 +120,48 @@ local_guard() {
   [[ "$ans" == "$(hostname)" ]] || die "Abgebrochen (Eingabe ≠ Hostname)."
 }
 
-# Ein Preset lokal anwenden (Lauf A + B) und Idempotenz prüfen. Returnt 0/1.
+LOCAL_APPLY_REASON=""
+
+# Relevante Fehlerzeilen eines Laufs-Logs anzeigen (fatal/FAILED + RECAP).
+show_log_errors() {
+  local logf="$1"
+  grep -nE '^fatal:|^failed:|FAILED!' "$logf" 2>/dev/null | tail -n 15 | sed 's/^/      /' >&2 || true
+  local rl; rl="$(grep -E 'ok=[0-9]+.*changed=[0-9]+' "$logf" | tail -n1 || true)"
+  [[ -n "$rl" ]] && printf '      RECAP: %s\n' "$rl" >&2
+  return 0
+}
+
+# Ein Preset lokal anwenden (Lauf A + B). Ausgabe zusätzlich nach $2 (Log).
+# Setzt LOCAL_APPLY_REASON bei Fehler. Returnt 0/1.
 local_apply() {
-  local f="$1" preset; preset="$(basename "$f" .yml)"
+  local f="$1" logf="$2" preset; preset="$(basename "$f" .yml)"
+  LOCAL_APPLY_REASON=""
+  : >"$logf"
+  local rcA=0 rcB=0
   section "$preset: Lauf A (Konvergenz)"
-  run_playbook -i "$REPO_ROOT/inventory.ini" "$REPO_ROOT/site.yml" -e "@$f"
+  run_playbook -i "$REPO_ROOT/inventory.ini" "$REPO_ROOT/site.yml" -e "@$f" 2>&1 | tee -a "$logf"
+  rcA="${PIPESTATUS[0]}"
+  if [[ "$rcA" -ne 0 ]]; then
+    LOCAL_APPLY_REASON="Lauf A (Konvergenz) fehlgeschlagen (rc=$rcA)"
+    return 1
+  fi
   section "$preset: Lauf B (Idempotenz)"
-  local logf; logf="$(mktemp)"
-  run_playbook -i "$REPO_ROOT/inventory.ini" "$REPO_ROOT/site.yml" -e "@$f" | tee "$logf"
+  run_playbook -i "$REPO_ROOT/inventory.ini" "$REPO_ROOT/site.yml" -e "@$f" 2>&1 | tee -a "$logf"
+  rcB="${PIPESTATUS[0]}"
   local rl ch fa
   rl="$(grep -E 'ok=[0-9]+.*changed=[0-9]+' "$logf" | tail -n1 || true)"
   ch="$(echo "$rl" | grep -oP 'changed=\K[0-9]+' || echo '?')"
   fa="$(echo "$rl" | grep -oP 'failed=\K[0-9]+' || echo '?')"
-  rm -f "$logf"
-  log "Idempotenz: changed=$ch failed=$fa"
-  [[ "$ch" == "0" && "$fa" == "0" ]]
+  log "Idempotenz (Lauf B): changed=$ch failed=$fa (rc=$rcB)"
+  if [[ "$rcB" -ne 0 || "$fa" != "0" ]]; then
+    LOCAL_APPLY_REASON="Lauf B: Task(s) fehlgeschlagen (failed=$fa, rc=$rcB)"
+    return 1
+  fi
+  if [[ "$ch" != "0" ]]; then
+    LOCAL_APPLY_REASON="nicht idempotent — changed=$ch im zweiten Lauf"
+    return 1
+  fi
+  return 0
 }
 
 # --- Befehle ------------------------------------------------------------------
@@ -180,11 +207,15 @@ cmd_apply() {
   local f; f="$(preset_file "${1:-}")"
   ensure_ansible
   local_guard
-  section "Apply Preset '$(basename "$f" .yml)' auf $(hostname)"
-  if local_apply "$f"; then
-    ok "Apply + Idempotenz PASS (Preset $(basename "$f" .yml))."
+  local preset logf; preset="$(basename "$f" .yml)"; logf="$(mktemp /tmp/anvil-apply-XXXXXX.log)"
+  section "Apply Preset '$preset' auf $(hostname)"
+  if local_apply "$f" "$logf"; then
+    ok "Apply + Idempotenz PASS (Preset $preset). Log: $logf"
   else
-    die "Apply/Idempotenz FAIL — siehe oben. Bei SSH-Problemen: sudo $REPO_ROOT/bootstrap.sh --rollback"
+    section "FEHLER"
+    error "$preset: $LOCAL_APPLY_REASON"
+    show_log_errors "$logf"
+    die "Apply FAIL. Volllog: $logf | Bei SSH-Problemen: sudo $REPO_ROOT/bootstrap.sh --rollback"
   fi
 }
 
@@ -196,18 +227,35 @@ cmd_vm_matrix() {
   # crown-totp-enrolled bewusst NICHT dabei (würde SSH ohne Secret sperren -> totp-test).
   # Array statt String: IFS=$'\n\t' splittet NICHT auf Leerzeichen!
   local order=(baseline minimal full crown crown-totp crown-egress)
-  local p f results="" failed=0 applied=0
+  local logdir; logdir="$(mktemp -d /tmp/anvil-matrix-XXXXXX)"
+  local p f results="" applied=0
+  declare -a fp=() fr=()
   for p in "${order[@]}"; do
     f="$PRESET_DIR/$p.yml"
     [[ -f "$f" ]] || { warn "Preset $p fehlt — übersprungen."; continue; }
     applied=$((applied + 1))
-    if local_apply "$f"; then results+="  ✓ $p\n"; ok "$p: PASS"
-    else results+="  ✗ $p\n"; failed=1; warn "$p: FAIL"; fi
+    if local_apply "$f" "$logdir/$p.log"; then
+      results+="  ✓ $p"$'\n'; ok "$p: PASS"
+    else
+      results+="  ✗ $p — $LOCAL_APPLY_REASON"$'\n'; fp+=("$p"); fr+=("$LOCAL_APPLY_REASON")
+      warn "$p: FAIL — $LOCAL_APPLY_REASON"
+    fi
   done
   [[ "$applied" -gt 0 ]] || die "Kein Preset angewendet — interner Fehler (Iteration leer)."
-  section "Matrix-Ergebnis"
-  printf '%b' "$results" >&2
-  if [[ "$failed" -eq 0 ]]; then ok "Matrix: ALLE PRESETS PASS"; else die "Matrix: es gab Fehlschläge."; fi
+
+  section "Zusammenfassung"
+  printf '%s' "$results" >&2
+
+  if [[ "${#fp[@]}" -gt 0 ]]; then
+    section "FEHLER-DETAILS (${#fp[@]} Preset(s))"
+    local i
+    for i in "${!fp[@]}"; do
+      error "── ${fp[$i]}: ${fr[$i]}"
+      show_log_errors "$logdir/${fp[$i]}.log"
+    done
+    die "Matrix: FEHLGESCHLAGEN — ${fp[*]}.  Volllogs: $logdir/"
+  fi
+  ok "Matrix: ALLE PRESETS PASS.  Logs: $logdir/"
 }
 
 # End-to-End-TOTP-Test (pam_oath) auf DIESEM Host: Test-Secret anlegen, enforced
