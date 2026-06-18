@@ -89,3 +89,18 @@ os_harden_tmp_mounts: true
 # su auf Mitglieder der sudo-Gruppe beschränken
 os_restrict_su: true
 os_su_group: sudo
+
+# auditd Log-Retention & Aktionen.
+# Hinweis: Aktionen sind bewusst verfügbarkeitsfreundlich (syslog statt halt/email),
+# da Anvil keinen MTA betreibt (Gotify) und ein halt einen KRITIS-Server lahmlegen
+# würde. Für strikte CIS-L2-Konformität ggf. auf 'halt'/'single' anheben.
+auditd_max_log_file: 50            # MB pro Logdatei
+auditd_num_logs: 10
+auditd_max_log_file_action: keep_logs
+auditd_space_left: 75             # MB
+auditd_space_left_action: syslog
+auditd_admin_space_left: 50       # MB
+auditd_admin_space_left_action: syslog
+auditd_disk_full_action: syslog
+auditd_disk_error_action: syslog
+auditd_action_mail_acct: root

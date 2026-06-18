@@ -16,6 +16,7 @@ anvil_backup_files:
   - /etc/fstab
   - /etc/chrony/chrony.conf
   - /etc/systemd/journald.conf
+  - /etc/audit/auditd.conf
   - /etc/audit/rules.d
   - /etc/fail2ban
   - /etc/modprobe.d

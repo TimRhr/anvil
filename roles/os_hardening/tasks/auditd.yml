@@ -1,4 +1,28 @@
 ---
+- name: "Auditd | auditd-Paket sicherstellen (self-contained)"
+  ansible.builtin.apt:
+    name: auditd
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: "Auditd | Regelverzeichnis sicherstellen"
+  ansible.builtin.file:
+    path: /etc/audit/rules.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: "Auditd | Hauptkonfiguration deployen (vollständig, deterministisch)"
+  ansible.builtin.template:
+    src: auditd.conf.j2
+    dest: /etc/audit/auditd.conf
+    owner: root
+    group: root
+    mode: "0640"
+  notify: Restart auditd
+
 - name: "Auditd | Regelwerk deployen"
   ansible.builtin.template:
     src: audit-anvil.rules.j2
@@ -9,22 +33,6 @@
   notify:
     - Load audit rules
     - Restart auditd
-
-- name: "Auditd | Log-Retention in auditd.conf setzen"
-  ansible.builtin.lineinfile:
-    path: /etc/audit/auditd.conf
-    regexp: "^{{ item.key }}\\s*="
-    line: "{{ item.key }} = {{ item.value }}"
-  loop:
-    - { key: "max_log_file", value: "50" }
-    - { key: "num_logs", value: "10" }
-    - { key: "max_log_file_action", value: "keep_logs" }
-    - { key: "space_left_action", value: "email" }
-    - { key: "admin_space_left_action", value: "halt" }
-    - { key: "disk_full_action", value: "halt" }
-  loop_control:
-    label: "{{ item.key }}"
-  notify: Restart auditd
 
 - name: "Auditd | Dienst aktivieren"
   ansible.builtin.systemd_service:
