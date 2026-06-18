@@ -22,6 +22,12 @@ reports/
 # Ansible-Collections, falls lokal installiert
 collections/
 
+# GitHub-Workflows: vorerst ignoriert, weil der aktuelle PAT keinen
+# 'workflow'-Scope hat (Push würde sonst abgelehnt). Zum Aktivieren diese Zeile
+# entfernen und Token um 'workflow'-Scope erweitern bzw. SSH-Remote nutzen,
+# dann: git add -f .github/workflows/lint.yml
+/.github/workflows/lint.yml
+
 # Editor-/OS-Müll
 *.swp
 *~
