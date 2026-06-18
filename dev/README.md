@@ -14,19 +14,36 @@ Zweck: verschiedene Settings-Kombinationen schnell durchtesten, **ohne**
 
 ## Benutzung
 
+`dev.sh` wird **direkt auf dem Test-Host** ausgeführt. Sichere Befehle (verändern
+nichts) gehen überall; `apply`/`vm-matrix`/`totp-test` **härten den lokalen Host**
+und sind daher nur in einer **Wegwerf-VM** gedacht (Sicherheitsabfrage schützt davor).
+
+### Sichere Befehle (auch auf dem Arbeitsrechner)
+
 ```bash
 dev/dev.sh list                  # Presets auflisten
-dev/dev.sh vars crown            # aufgelöste Posture-/Toggle-Variablen anzeigen (safe)
+dev/dev.sh vars crown            # aufgelöste Posture-/Toggle-Variablen anzeigen
 dev/dev.sh lint                  # shellcheck + yamllint + ansible-lint + syntax-check
-dev/dev.sh matrix                # lint + vars für ALLE Presets (schnelle Gesamtprüfung)
+dev/dev.sh matrix                # lint + vars für ALLE Presets
 dev/dev.sh check crown           # lokaler Dry-Run (--check, KEINE Änderungen; sudo nötig)
+```
 
-# Voller Apply-Test nur in einer Wegwerf-VM (nie localhost):
-dev/dev.sh vm-up anvil-dev 24.04
-dev/dev.sh apply crown anvil-dev   # Apply + automatischer Idempotenz-Check in der VM
-dev/dev.sh vm-matrix anvil-dev     # ALLE Presets nacheinander (Idempotenz je Preset)
-dev/dev.sh totp-test anvil-dev     # End-to-End-TOTP-Test (pam_oath) via pamtester
-dev/dev.sh vm-rm anvil-dev
+### Verändernde Befehle — IN DER VM ausführen
+
+Repo in die VM holen (z.B. `git clone` oder kopieren), dann **in der VM**:
+
+```bash
+cd /pfad/zu/anvil
+dev/dev.sh apply crown           # dieses Preset auf DIESEM Host anwenden + Idempotenz-Check
+dev/dev.sh vm-matrix             # ALLE unkritischen Presets nacheinander
+dev/dev.sh totp-test             # End-to-End-TOTP-Test (pam_oath) via pamtester
+```
+
+Vor Änderungen fragt `dev.sh` nach dem **Hostnamen** (Schutz vor versehentlichem
+Härten des Arbeitsrechners). Nicht-interaktiv erzwingen:
+
+```bash
+ANVIL_DEV_FORCE=1 dev/dev.sh vm-matrix
 ```
 
 ## Presets (`dev/presets/`)
