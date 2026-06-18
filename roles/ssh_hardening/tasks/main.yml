@@ -6,8 +6,10 @@
 # Self-Test. Bei ungültiger Konfiguration wird die Änderung zurückgenommen.
 # =============================================================================
 
+# include_tasks (dynamisch): im baseline wird mfa.yml gar nicht erst geladen,
+# daher keine Template-Auswertung der mfa-Tasknamen/-Variablen.
 - name: "SSH | MFA konfigurieren (crown_jewels-Posture)"
-  ansible.builtin.import_tasks: mfa.yml
+  ansible.builtin.include_tasks: mfa.yml
   when: anvil_crown_jewels | bool
   tags: [ssh, mfa]
 

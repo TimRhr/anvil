@@ -30,7 +30,7 @@
     ssh_mfa_totp_enforce: "{{ _ssh_mfa_effective == 'totp' and (ssh_totp_enrolled | default(false) | bool) }}"
   tags: [ssh, mfa]
 
-- name: "MFA | Methode: {{ ssh_mfa_effective }}"
+- name: "MFA | Effektive Methode anzeigen"
   ansible.builtin.debug:
     msg: >-
       SSH-MFA: {{ ssh_mfa_effective }} (Enforce: fido2={{ ssh_mfa_fido2_enforce }},
