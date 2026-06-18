@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# =============================================================================
+# anvil-status-report — wöchentlicher Sicherheitsstatus -> Gotify + Report
+#
+# Sammelt fehlertolerant Lynis-Index (+ Trend), ausstehende Security-Updates,
+# Drift (offene Ports), fail2ban-Bans, fehlgeschlagene Dienste, Reboot-/Kernel-
+# Fallback-Status, Zeitsync und auditd-Status. Schreibt einen Report und pusht
+# eine Zusammenfassung via anvil-notify (Priorität eskaliert bei Problemen).
+#
+# Aufruf: per systemd-Timer (anvil-status.timer) oder on-demand
+#         (sudo anvil-status-report  bzw.  sudo bootstrap.sh --status).
+# =============================================================================
+set -uo pipefail
+
+STATE_DIR=/var/lib/anvil
+REPORT_DIR=/var/log/anvil/reports
+HISTORY="$STATE_DIR/status-history"
+NOTIFY=/usr/local/bin/anvil-notify
+HOST="$(hostname -s 2>/dev/null || echo host)"
+DATE="$(date '+%Y-%m-%d')"
+NOW="$(date '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || date)"
+
+mkdir -p "$STATE_DIR" "$REPORT_DIR" 2>/dev/null || true
+
+# --- 1. Lynis-Hardening-Index + Findings -------------------------------------
+index="n/a"; findings="?"
+if command -v lynis >/dev/null 2>&1; then
+  lynis audit system --quiet --no-colors >/dev/null 2>&1 || true
+  if [[ -r /var/log/lynis-report.dat ]]; then
+    index="$(grep -E '^hardening_index=' /var/log/lynis-report.dat 2>/dev/null | tail -n1 | cut -d= -f2)"
+    findings="$(grep -cE '^(warning|suggestion)\[\]=' /var/log/lynis-report.dat 2>/dev/null || echo '?')"
+  fi
+fi
+[[ -n "$index" ]] || index="n/a"
+
+# --- 2. Trend gegen letzten Lauf ---------------------------------------------
+trend="→"; delta=""
+if [[ "$index" =~ ^[0-9]+$ && -r "$HISTORY" ]]; then
+  prev="$(grep -E '^[0-9-]+,[0-9]+,' "$HISTORY" 2>/dev/null | tail -n1 | cut -d, -f2)"
+  if [[ "$prev" =~ ^[0-9]+$ ]]; then
+    d=$(( index - prev ))
+    if   (( d > 0 )); then trend="↑"; delta="+$d"
+    elif (( d < 0 )); then trend="↓"; delta="$d"
+    else                   trend="→"; delta="±0"
+    fi
+  fi
+fi
+[[ "$index" =~ ^[0-9]+$ ]] && printf '%s,%s,%s\n' "$DATE" "$index" "$findings" >>"$HISTORY"
+
+# --- 3. Ausstehende Security-Updates -----------------------------------------
+sec_updates=0
+if [[ -x /usr/lib/update-notifier/apt-check ]]; then
+  sec_updates="$(/usr/lib/update-notifier/apt-check 2>&1 | cut -d';' -f2)"
+else
+  sec_updates="$(apt-get -s -o Debug::NoLocking=true upgrade 2>/dev/null | grep -ciE '^Inst .*security' || true)"
+fi
+[[ "$sec_updates" =~ ^[0-9]+$ ]] || sec_updates=0
+
+# --- 4. Drift / offene Ports -------------------------------------------------
+listen_ports="$(ss -tlnH 2>/dev/null | awk '{print $4}' \
+  | grep -vE '^(127\.|\[?::1\]?:)' | sed -E 's/.*:([0-9]+)$/\1/' | sort -un | wc -l)"
+drift_uncovered="n/a"
+# Dateinamen sind datumsbasiert (drift-YYYY-MM-DD.txt) -> ls -t unkritisch.
+# shellcheck disable=SC2012
+latest_drift="$(ls -1t "$REPORT_DIR"/drift-*.txt 2>/dev/null | head -n1)"
+if [[ -n "$latest_drift" && -r "$latest_drift" ]]; then
+  drift_uncovered="$(grep -E '^UNGEDECKT:' "$latest_drift" 2>/dev/null | tail -n1 | sed -E 's/^UNGEDECKT:[[:space:]]*//')"
+  [[ -n "$drift_uncovered" ]] || drift_uncovered="(keine)"
+fi
+
+# --- 5. Weitere Metriken -----------------------------------------------------
+f2b_bans=0
+if command -v fail2ban-client >/dev/null 2>&1; then
+  f2b_bans="$(fail2ban-client banned 2>/dev/null | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}' | wc -l)"
+fi
+[[ "$f2b_bans" =~ ^[0-9]+$ ]] || f2b_bans=0
+
+failed_svc="$(systemctl --failed --no-legend --plain 2>/dev/null | grep -c '\.service' || true)"
+[[ "$failed_svc" =~ ^[0-9]+$ ]] || failed_svc=0
+
+reboot_req="nein"; [[ -f /var/run/reboot-required ]] && reboot_req="JA"
+
+fallback="nein"
+[[ -f "$STATE_DIR/last-fallback" ]] && fallback="JA ($(cat "$STATE_DIR/last-fallback" 2>/dev/null))"
+
+timesync="?"
+if command -v chronyc >/dev/null 2>&1; then
+  if chronyc tracking 2>/dev/null | grep -q 'Leap status.*: Normal'; then
+    timesync="ok"
+  else
+    timesync="NICHT synchron"
+  fi
+fi
+
+auditd_state="$(systemctl is-active auditd 2>/dev/null || echo inactive)"
+
+# --- 6. Priorität (Gotify 0..10) ---------------------------------------------
+prio=3   # info
+if [[ "$sec_updates" -gt 0 || "$failed_svc" -gt 0 || "$reboot_req" == "JA" \
+      || "$trend" == "↓" || ( "$drift_uncovered" != "n/a" && "$drift_uncovered" != "(keine)" ) ]]; then
+  prio=6   # warn
+fi
+if [[ "$fallback" != "nein" || "$auditd_state" != "active" ]]; then
+  prio=9   # alert
+fi
+
+# --- 7. Bericht + Push -------------------------------------------------------
+title="Anvil Status: $HOST — Index ${index} (${trend}${delta})"
+msg="$(cat <<EOF
+Lynis-Index: ${index} (${trend}${delta}), Findings: ${findings}
+Security-Updates: ${sec_updates}
+Drift: ungedeckt=${drift_uncovered}, ext. Ports=${listen_ports}
+fail2ban-Bans: ${f2b_bans} | failed services: ${failed_svc}
+Reboot nötig: ${reboot_req} | Kernel-Fallback: ${fallback}
+Zeitsync: ${timesync} | auditd: ${auditd_state}
+EOF
+)"
+
+report="$REPORT_DIR/status-${DATE}.txt"
+{
+  echo "Anvil Sicherheitsstatus — $NOW"
+  echo "Host: $HOST"
+  echo "================================================================"
+  echo "$title"
+  echo
+  echo "$msg"
+} >"$report" 2>/dev/null || true
+chmod 0640 "$report" 2>/dev/null || true
+
+if [[ -x "$NOTIFY" ]]; then
+  "$NOTIFY" --priority "$prio" --title "$title" "$msg
+Report: $report" || true
+fi
+
+printf '%s\n' "$title"
+exit 0

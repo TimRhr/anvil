@@ -289,6 +289,34 @@ sudo anvil-prepare-kernel-reboot
 | fail2ban-Status | `sudo fail2ban-client status sshd` |
 | Zeitsync prüfen | `chronyc tracking` |
 | AIDE manuell prüfen | `sudo /etc/cron.daily/anvil-aide` |
+| Sicherheitsstatus jetzt senden | `sudo ./bootstrap.sh --status` |
+
+---
+
+## Continuous Compliance (wöchentlicher Statusbericht)
+
+Anvil installiert einen systemd-Timer **`anvil-status.timer`**, der wöchentlich einen
+**Sicherheitsstatus** erzeugt und per **Gotify** meldet — ohne Login. Inhalt:
+Lynis-Hardening-Index **+ Trend** (↑/↓/→), ausstehende Security-Updates, Drift (offene
+Ports), fail2ban-Bans, fehlgeschlagene Dienste, Reboot-/Kernel-Fallback-Status, Zeitsync,
+auditd-Status. Die Priorität eskaliert (info → warn → alert), sodass Probleme auffallen.
+
+```bash
+# Status sofort erzeugen (on demand):
+sudo ./bootstrap.sh --status        # oder: sudo /usr/local/sbin/anvil-status-report
+
+# Geplanten Lauf prüfen:
+systemctl list-timers anvil-status.timer
+
+# Voller Report + Verlauf:
+ls /var/log/anvil/reports/status-*.txt
+cat /var/lib/anvil/status-history          # datum,index,findings (Trend)
+```
+
+**Intervall ändern:** `ANVIL_COMPLIANCE_SCHEDULE` in `config/anvil.conf` (systemd-OnCalendar,
+z.B. `daily` oder `Mon *-*-* 06:00:00`), dann `sudo ./bootstrap.sh apply`.
+**Abschalten:** in `group_vars/all/main.yml` `compliance_schedule_enabled: false` →
+nächster Lauf entfernt den Timer (das `--status`-Skript bleibt erhalten).
 
 ---
 

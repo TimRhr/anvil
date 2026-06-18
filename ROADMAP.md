@@ -107,60 +107,24 @@ Audit erweitert — und meldet etwaige nicht abgedeckte Dienste.
 
 ---
 
-## Phase 4 — Supply-Chain & Secrets ☐
+## Phase 4 — Continuous Compliance ◐
 
-**Ziel:** Vertrauen in den Pull-Pfad und Secrets-at-Rest härten (adressiert SC-1, SE-1, PR-1).
+**Ziel:** belegbarer Sicherheitszustand mit minimalem Aufwand — ohne SIEM/SCAP-Infrastruktur.
+Umgesetzt als Rolle [`roles/compliance`](roles/compliance): Status-Skript + wöchentlicher
+systemd-Timer. Doku: [docs/runbook.md](docs/runbook.md#continuous-compliance-wöchentlicher-statusbericht).
 
-- ☐ **Signierte Stände (SC-1)**: `anvil-pull-run` verifiziert Commit-/Tag-Signatur
-  (`git verify-commit`, allowed_signers) und nagelt auf getaggten Stand statt `HEAD` fest;
-  **Read-only Deploy-Key**, Branch-Protection, optional manuelle Freigabe vor Apply.
-- ☐ **Strikter Config-Parser (PR-1)**: `config/anvil.conf` nicht mehr `source`n, sondern
-  whitelist-basiert parsen; Eigentum/Rechte (root:root 0640) erzwingen & prüfen.
-- ☐ **Secrets-at-Rest (SE-1)**: Laufzeit-Abruf statt persistentem `.vault_pass` —
-  Option A `sops`+age mit TPM-/`systemd-creds`-gebundenem Schlüssel, Option B externer
-  Vault-Server; Secrets auf dem Host minimieren, Rotation dokumentieren.
-- ☐ **Heartbeat/Alert-Integrität (MI-1)**: Gotify-Token rotierbar, Heartbeat-Alarm,
-  optional mTLS/Pinning.
+- ☑ **Geplanter Selbst-Audit**: `anvil-status.timer` (Default `Sun *-*-* 04:00`, via
+  `ANVIL_COMPLIANCE_SCHEDULE` änderbar) ruft [`anvil-status-report`](roles/compliance/files/anvil-status-report)
+  auf → Lynis-Index **+ Trend** (↑/↓/→) aus `/var/lib/anvil/status-history`.
+- ☑ **Voller Gotify-Statusbericht**: Lynis-Index/Trend + Security-Updates + Drift (offene
+  Ports) + fail2ban-Bans + failed services + Reboot-/Kernel-Fallback-Status + Zeitsync +
+  auditd; **Priorität eskaliert** (info→warn→alert). On-demand via `bootstrap.sh --status`.
+- ☐ **OpenSCAP/CIS-Scan (optional)**: nur bei Bedarf als Zusatz zur `audit`-Rolle (HTML-Report).
+- ☐ **VM-Abnahme**: Timer + Push in einer VM bestätigen (`dev/dev.sh apply` → `--status`).
 
-**Akzeptanz:** Ein manipulierter Repo-Stand wird vom Timer **abgelehnt**; ein
-Host-Compromise gibt nicht automatisch alle Secrets preis.
+Zentrales SIEM bleibt ein **Toggle** (`enable_remote_syslog`), kein Default.
 
----
-
-## Phase 5 — Observability & Continuous Compliance ☐
-
-**Ziel:** belegbarer, fortlaufender Sicherheitszustand.
-
-- ☐ **OpenSCAP/CIS-Scan** als optionale Erweiterung der `audit`-Rolle (HTML/XML-Report).
-- ☐ **Geplante Prüfungen**: systemd-Timer für periodischen Lynis/OpenSCAP-Lauf + Gotify-Summary
-  (Hardening-Index-Trend).
-- ☐ **Zentrales Logging/SIEM** als empfohlener Default der Kronjuwelen-Posture (siehe DT-1).
-- ☐ **Evidence/Reporting**: maschinenlesbare Reports unter `/var/log/anvil/reports/`,
-  Mapping gegen [docs/compliance-matrix.md](docs/compliance-matrix.md).
-
-**Akzeptanz:** Nach jedem Lauf liegt ein datierter Compliance-Report vor; Trend ist sichtbar.
+**Akzeptanz:** Ein wiederkehrender Lauf liefert einen datierten Report + Gotify-Trend; manuelle
+Auswertung genügt.
 
 ---
-
-## Phase 6 — Test- & Release-Engineering ☐
-
-**Ziel:** Vertrauen in jede Änderung.
-
-- ☐ **Molecule-Matrix** auf Ubuntu 24.04 **und** 26.04 (+ Debian 12) — Converge, **Idempotenz** (`changed=0`), Self-Tests.
-- ☐ **Kernel-Fallback-Integrationstest** (defekter One-shot → Fallback) in einer VM-Pipeline.
-- ☐ **CI-Reaktivierung**: `.github/workflows/lint.yml` mit `workflow`-Scope/SSH wieder ins Remote
-  (aktuell lokal gitignored); Matrix-Jobs ergänzen.
-- ☐ **Releases**: getaggte, **signierte** Versionen + `CHANGELOG.md`; der Pull-Timer (Phase 4)
-  konsumiert nur getaggte Stände.
-
-**Akzeptanz:** Grüne CI auf beiden Ubuntu-Versionen ist Pflicht-Gate für jeden Release-Tag.
-
----
-
-## Priorisierung (Vorschlag)
-
-1. **Phase 1** (Provisionierung 24.04/26.04 verifizieren) — Fundament.
-2. **Phase 3** (Schichten-/App-Modell) — direkt der Nutzer-Wunsch „erneut laufen & anpassen".
-3. **Phase 2** (Kronjuwelen-Posture) — Höchsthärtung.
-4. **Phase 4** (Supply-Chain/Secrets) — kritisch, sobald der Pull-Timer produktiv läuft.
-5. **Phase 5 + 6** parallel begleitend (Compliance-Nachweis & Test-Gates).

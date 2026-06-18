@@ -72,6 +72,10 @@
     - role: profiles
       tags: [profiles, drift]
 
+    # 12. Continuous Compliance: geplanter Selbst-Audit + Gotify-Statusbericht
+    - role: compliance
+      tags: [compliance]
+
   post_tasks:
     - name: "Anvil | Abschluss-Benachrichtigung (Gotify)"
       ansible.builtin.command:

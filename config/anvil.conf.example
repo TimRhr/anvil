@@ -38,6 +38,12 @@ ANVIL_SSH_MFA="auto"
 # Verfügbar: reverse_proxy, container_host
 ANVIL_PROFILES=()
 
+# --- Continuous Compliance (siehe docs/runbook.md) -----------------------------
+# Wöchentlicher Selbst-Audit (Lynis) + Gotify-Statusbericht. systemd-OnCalendar-
+# Ausdruck; leer lassen für den Default (sonntags 04:00). Abschalten des Timers:
+# in group_vars/all/main.yml compliance_schedule_enabled=false.
+ANVIL_COMPLIANCE_SCHEDULE="Sun *-*-* 04:00:00"
+
 # --- Feature-Toggles (übersteuern group_vars/all/main.yml) --------------------
 ENABLE_FAIL2BAN=true
 ENABLE_AIDE=true

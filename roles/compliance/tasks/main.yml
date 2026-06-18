@@ -1,0 +1,99 @@
+---
+# =============================================================================
+# roles/compliance — geplanter Selbst-Audit + Gotify-Statusbericht (Phase 4)
+#
+# Installiert das Status-Skript (immer, auch für `--status` on-demand) und einen
+# wöchentlichen systemd-Timer (wenn compliance_schedule_enabled). Ist der Timer
+# abgeschaltet, wird er sauber entfernt.
+# =============================================================================
+
+- name: "Compliance | lynis sicherstellen (für den Selbst-Audit)"
+  ansible.builtin.apt:
+    name: lynis
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [compliance]
+
+- name: "Compliance | State-/Report-Verzeichnisse"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  loop:
+    - "{{ anvil_state_dir }}"
+    - "{{ anvil_report_dir }}"
+  tags: [compliance]
+
+- name: "Compliance | Status-Skript installieren"
+  ansible.builtin.copy:
+    src: anvil-status-report
+    dest: /usr/local/sbin/anvil-status-report
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [compliance]
+
+- name: "Compliance | systemd-Service installieren"
+  ansible.builtin.copy:
+    src: anvil-status.service
+    dest: /etc/systemd/system/anvil-status.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Compliance reload systemd
+  tags: [compliance]
+
+- name: "Compliance | systemd-Timer installieren (geplant)"
+  ansible.builtin.template:
+    src: anvil-status.timer.j2
+    dest: /etc/systemd/system/anvil-status.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Compliance reload systemd
+  when: compliance_schedule_enabled | bool
+  tags: [compliance]
+
+- name: "Compliance | systemd jetzt neu einlesen"
+  ansible.builtin.meta: flush_handlers
+  tags: [compliance]
+
+- name: "Compliance | Timer aktivieren & starten"
+  ansible.builtin.systemd_service:
+    name: anvil-status.timer
+    enabled: true
+    state: started
+  when:
+    - compliance_schedule_enabled | bool
+    - not ansible_check_mode
+  tags: [compliance]
+
+- name: "Compliance | Timer entfernen, wenn abgeschaltet"
+  when: not (compliance_schedule_enabled | bool)
+  tags: [compliance]
+  block:
+    - name: "Compliance | Timer stoppen/deaktivieren"
+      ansible.builtin.systemd_service:
+        name: anvil-status.timer
+        enabled: false
+        state: stopped
+      failed_when: false
+      when: not ansible_check_mode
+
+    - name: "Compliance | Timer-Unit entfernen"
+      ansible.builtin.file:
+        path: /etc/systemd/system/anvil-status.timer
+        state: absent
+      notify: Compliance reload systemd
+
+- name: "Compliance | Statusbericht einmalig beim Apply senden"
+  ansible.builtin.command: /usr/local/sbin/anvil-status-report
+  changed_when: false
+  failed_when: false
+  when:
+    - compliance_report_on_apply | bool
+    - not ansible_check_mode
+  tags: [compliance]

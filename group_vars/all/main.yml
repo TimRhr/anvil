@@ -56,6 +56,15 @@ docker_hardening:
 docker_restrict_published: false
 docker_published_allow: []   # Ports, die DOCKER-USER von außen zulässt
 
+# --- Continuous Compliance (Phase 4, siehe docs/runbook.md) -------------------
+# Wöchentlicher Selbst-Audit (Lynis) + Gotify-Statusbericht via systemd-Timer.
+compliance_schedule_enabled: true
+# systemd OnCalendar (Default: sonntags 04:00). Aus config/anvil.conf übersteuerbar.
+compliance_oncalendar: "Sun *-*-* 04:00:00"
+compliance_randomized_delay: 1800
+# Zusätzlich beim Anvil-Lauf sofort einen Statusbericht senden?
+compliance_report_on_apply: true
+
 # --- Admin-/Standard-User -----------------------------------------------------
 # Werden i.d.R. aus config/anvil.conf via -e gesetzt. Defaults hier als Fallback.
 admin_user: admin

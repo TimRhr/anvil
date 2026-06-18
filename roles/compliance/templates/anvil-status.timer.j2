@@ -1,0 +1,11 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Anvil — geplanter Sicherheitsstatus-Bericht
+
+[Timer]
+OnCalendar={{ compliance_oncalendar }}
+RandomizedDelaySec={{ compliance_randomized_delay }}
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -47,6 +47,7 @@ BEFEHLE:
   --rollback            Letztes Config-Backup wiederherstellen
   --reboot-if-needed    Nach Kernel-Update sicher rebooten (Kernel-Fallback aktiv)
   --enable-timer URL    Continuous Enforcement via ansible-pull aktivieren
+  --status              Sicherheitsstatus jetzt erzeugen + an Gotify senden
 
 OPTIONEN:
   --check               Dry-Run (zeigt Änderungen, ändert nichts)
@@ -74,6 +75,7 @@ parse_args() {
       --rollback)         MODE="rollback" ;;
       --reboot-if-needed) MODE="reboot" ;;
       --enable-timer)     MODE="enable-timer"; PULL_URL="${2:?--enable-timer benötigt eine Repo-URL}"; shift ;;
+      --status)           MODE="status" ;;
       -h|--help)          usage; exit 0 ;;
       *)                  die "Unbekannte Option: $1 (siehe --help)" ;;
     esac
@@ -166,6 +168,7 @@ build_extra_vars() {
   "timezone": "${ANVIL_TIMEZONE:-Europe/Berlin}",
   "anvil_posture": "${ANVIL_POSTURE:-baseline}",
   "ssh_mfa_method": "${ANVIL_SSH_MFA:-auto}",
+  "compliance_oncalendar": "${ANVIL_COMPLIANCE_SCHEDULE:-Sun *-*-* 04:00:00}",
   "anvil_profiles": ${profiles_json}
 }
 EOF
@@ -286,6 +289,14 @@ do_enable_timer() {
   ok "anvil-pull.timer aktiviert (Repo: $PULL_URL, Checkout: $SCRIPT_DIR)."
 }
 
+# --- Sicherheitsstatus on demand ---------------------------------------------
+do_status() {
+  local s=/usr/local/sbin/anvil-status-report
+  [[ -x "$s" ]] || die "Status-Skript fehlt — erst 'sudo $0 apply' ausführen (installiert es)."
+  section "Sicherheitsstatus erzeugen"
+  exec "$s"
+}
+
 # --- main ---------------------------------------------------------------------
 main() {
   parse_args "$@"
@@ -301,6 +312,7 @@ main() {
     rollback)     do_rollback ;;
     reboot)       do_reboot ;;
     enable-timer) do_enable_timer ;;
+    status)       do_status ;;
     *)            die "Unbekannter Modus: $MODE" ;;
   esac
 }

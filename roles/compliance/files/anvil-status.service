@@ -1,0 +1,11 @@
+[Unit]
+Description=Anvil — Sicherheitsstatus-Bericht (Lynis + Metriken -> Gotify)
+Documentation=https://example.invalid/anvil
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/anvil-status-report
+Nice=10
+IOSchedulingClass=idle
