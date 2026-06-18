@@ -21,12 +21,49 @@
     direction: in
   tags: [firewall]
 
-- name: "Firewall | SSH zuerst freigeben (rate-limited)"
+- name: "Firewall | SSH freigeben (rate-limited, ohne Quellbeschränkung)"
   community.general.ufw:
     rule: "{{ 'limit' if firewall_ssh_rate_limit | bool else 'allow' }}"
     port: "{{ ssh_port | string }}"
     proto: tcp
     comment: "anvil: ssh"
+  when: ssh_allowed_cidrs | default([]) | length == 0
+  tags: [firewall]
+
+- name: "Firewall | SSH freigeben — nur Management-Netze (ssh_allowed_cidrs)"
+  community.general.ufw:
+    rule: "{{ 'limit' if firewall_ssh_rate_limit | bool else 'allow' }}"
+    port: "{{ ssh_port | string }}"
+    proto: tcp
+    from_ip: "{{ item }}"
+    comment: "anvil: ssh from {{ item }}"
+  loop: "{{ ssh_allowed_cidrs | default([]) }}"
+  when: ssh_allowed_cidrs | default([]) | length > 0
+  tags: [firewall]
+
+# --- Egress-Firewall (NW-1) --------------------------------------------------
+- name: "Firewall | Egress: Allowlist-Regeln setzen (vor default deny)"
+  community.general.ufw:
+    rule: allow
+    direction: out
+    port: "{{ item.port | string }}"
+    proto: "{{ item.proto | default('tcp') }}"
+    comment: "anvil: egress {{ item.comment | default(item.port) }}"
+  loop: "{{ firewall_egress_allow }}"
+  when: firewall_egress_enforce | bool
+  tags: [firewall]
+
+- name: "Firewall | Egress: Remote-Syslog-Port ergänzen falls aktiv"
+  community.general.ufw:
+    rule: allow
+    direction: out
+    port: "{{ remote_syslog_port | string }}"
+    proto: "{{ 'tcp' if remote_syslog_protocol in ('tcp', 'tls') else 'udp' }}"
+    comment: "anvil: egress remote-syslog"
+  when:
+    - firewall_egress_enforce | bool
+    - enable_remote_syslog | bool
+    - remote_syslog_host | length > 0
   tags: [firewall]
 
 - name: "Firewall | Zusätzliche Freigaben"
@@ -45,7 +82,7 @@
     policy: "{{ item.policy }}"
   loop:
     - { direction: incoming, policy: "{{ firewall_default_incoming }}" }
-    - { direction: outgoing, policy: "{{ firewall_default_outgoing }}" }
+    - { direction: outgoing, policy: "{{ 'deny' if firewall_egress_enforce | bool else firewall_default_outgoing }}" }
     - { direction: routed, policy: deny }
   tags: [firewall]
 

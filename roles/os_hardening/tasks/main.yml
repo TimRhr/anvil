@@ -87,3 +87,7 @@
 - name: "OS | Cron-Zugriffskontrolle"
   ansible.builtin.import_tasks: cron.yml
   tags: [os, cron]
+
+- name: "OS | Angriffsfläche erfassen"
+  ansible.builtin.import_tasks: attack_surface.yml
+  tags: [os, attack_surface]

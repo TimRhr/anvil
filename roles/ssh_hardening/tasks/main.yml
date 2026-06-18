@@ -6,6 +6,11 @@
 # Self-Test. Bei ungültiger Konfiguration wird die Änderung zurückgenommen.
 # =============================================================================
 
+- name: "SSH | MFA konfigurieren (crown_jewels-Posture)"
+  ansible.builtin.import_tasks: mfa.yml
+  when: anvil_crown_jewels | bool
+  tags: [ssh, mfa]
+
 - name: "SSH | openssh-server sicherstellen"
   ansible.builtin.apt:
     name: openssh-server

@@ -1,0 +1,131 @@
+---
+# =============================================================================
+# roles/ssh_hardening/tasks/mfa.yml — SSH-Multi-Faktor (AU-1)
+#
+# FIDO2 (sk-ssh-ed25519, Hardware) ODER TOTP via OATH Toolkit (pam_oath, FOSS,
+# vendor-neutral — funktioniert mit beliebiger TOTP-App: Aegis, FreeOTP, …).
+# Lockout-sicher: Enforce nur bei vorhandenem sk-Key (FIDO2) bzw. bestätigtem
+# Enrollment (TOTP). Steuert über ssh_mfa_method (auto|none|fido2|totp).
+# =============================================================================
+
+- name: "MFA | Methode auflösen (auto → fido2 im crown, sonst none)"
+  ansible.builtin.set_fact:
+    _ssh_mfa_effective: >-
+      {%- if ssh_mfa_method == 'auto' -%}
+        {{ 'fido2' if anvil_crown_jewels | bool else 'none' }}
+      {%- else -%}
+        {{ ssh_mfa_method }}
+      {%- endif -%}
+  tags: [ssh, mfa]
+
+- name: "MFA | FIDO2: sk-Keys in admin_pubkeys vorhanden?"
+  ansible.builtin.set_fact:
+    _ssh_has_sk_keys: "{{ admin_pubkeys | select('match', '^(sk-ssh-ed25519@|sk-ecdsa-sha2-)') | list | length > 0 }}"
+  tags: [ssh, mfa]
+
+- name: "MFA | Enforce-Entscheidungen ableiten"
+  ansible.builtin.set_fact:
+    ssh_mfa_effective: "{{ _ssh_mfa_effective }}"
+    ssh_mfa_fido2_enforce: "{{ _ssh_mfa_effective == 'fido2' and _ssh_has_sk_keys | bool }}"
+    ssh_mfa_totp_enforce: "{{ _ssh_mfa_effective == 'totp' and (ssh_totp_enrolled | default(false) | bool) }}"
+  tags: [ssh, mfa]
+
+- name: "MFA | Methode: {{ ssh_mfa_effective }}"
+  ansible.builtin.debug:
+    msg: >-
+      SSH-MFA: {{ ssh_mfa_effective }} (Enforce: fido2={{ ssh_mfa_fido2_enforce }},
+      totp={{ ssh_mfa_totp_enforce }}); ssh_mfa_method={{ ssh_mfa_method }}, posture={{ anvil_posture }}
+  tags: [ssh, mfa]
+
+- name: "MFA | FIDO2: Lockout-Schutz — kein sk-Key vorhanden"
+  ansible.builtin.debug:
+    msg: >-
+      ⚠️ Kein sk-ssh-ed25519/sk-ecdsa-Key in admin_pubkeys. FIDO2 wird NICHT
+      erzwungen (publickey bleibt aktiv). Mit 'ssh-keygen -t ed25519-sk' einen
+      hardware-gebundenen Key erzeugen und in config/anvil.conf eintragen.
+  when:
+    - _ssh_mfa_effective == 'fido2'
+    - not _ssh_has_sk_keys | bool
+  tags: [ssh, mfa]
+
+# --- TOTP via OATH Toolkit (pam_oath) ----------------------------------------
+- name: "MFA | TOTP: staged (kein Enrollment bestätigt)"
+  ansible.builtin.debug:
+    msg: >-
+      ⚠️ ssh_totp_enrolled ist nicht true — TOTP wird NICHT erzwungen. Pro Admin
+      ein Secret in /etc/users.oath anlegen (oathtool --totp), App einrichten,
+      dann ssh_totp_enrolled=true setzen. Zweite SSH-Sitzung offen halten!
+  when:
+    - _ssh_mfa_effective == 'totp'
+    - not (ssh_totp_enrolled | default(false) | bool)
+  tags: [ssh, mfa]
+
+- name: "MFA | TOTP: OATH Toolkit installieren"
+  ansible.builtin.apt:
+    name:
+      - libpam-oath
+      - oathtool
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: ssh_mfa_totp_enforce | bool
+  tags: [ssh, mfa]
+
+- name: "MFA | TOTP: Secret-Store /etc/users.oath sicherstellen (bestehende erhalten)"
+  ansible.builtin.copy:
+    dest: /etc/users.oath
+    content: |
+      # {{ ansible_managed }}
+      # OATH/TOTP-Secrets je Admin-User (vendor-neutral, RFC 6238).
+      # Format:  HOTP/T30/6  <user>  -  <HEX-SECRET>
+      # Enrollment: HEX="$(head -c 20 /dev/urandom | xxd -p -c40)"; \
+      #             echo "HOTP/T30/6 <user> - $HEX" >> /etc/users.oath; \
+      #             oathtool --verbose --totp "$HEX"   # Base32 in die TOTP-App
+    owner: root
+    group: root
+    mode: "0600"
+    force: false
+  when: ssh_mfa_totp_enforce | bool
+  tags: [ssh, mfa]
+
+- name: "MFA | TOTP: pam_oath in /etc/pam.d/sshd einbinden"
+  ansible.builtin.blockinfile:
+    path: /etc/pam.d/sshd
+    marker: "# {mark} ANVIL TOTP (pam_oath)"
+    insertbefore: BOF
+    block: |
+      auth requisite pam_oath.so usersfile=/etc/users.oath window=20 digits=6
+  when: ssh_mfa_totp_enforce | bool
+  notify: Reload sshd
+  tags: [ssh, mfa]
+
+# UNIX-Passwort-Abfrage (common-auth) für sshd deaktivieren — sonst würde der
+# keyboard-interactive-Schritt ZUSÄTZLICH das Passwort verlangen (Lockout für
+# key-only-Admins). Reversibel.
+- name: "MFA | TOTP: common-auth für sshd deaktivieren"
+  ansible.builtin.replace:
+    path: /etc/pam.d/sshd
+    regexp: '^@include common-auth$'
+    replace: '#@include common-auth  # Anvil TOTP: durch pam_oath ersetzt'
+  when: ssh_mfa_totp_enforce | bool
+  notify: Reload sshd
+  tags: [ssh, mfa]
+
+# --- TOTP-Revert: idempotent, wenn TOTP (mehr) nicht erzwungen wird -----------
+- name: "MFA | TOTP: pam_oath-Block entfernen (nicht aktiv)"
+  ansible.builtin.blockinfile:
+    path: /etc/pam.d/sshd
+    marker: "# {mark} ANVIL TOTP (pam_oath)"
+    state: absent
+  when: not ssh_mfa_totp_enforce | bool
+  notify: Reload sshd
+  tags: [ssh, mfa]
+
+- name: "MFA | TOTP: common-auth für sshd reaktivieren (nicht aktiv)"
+  ansible.builtin.replace:
+    path: /etc/pam.d/sshd
+    regexp: '^#@include common-auth  # Anvil TOTP: durch pam_oath ersetzt$'
+    replace: '@include common-auth'
+  when: not ssh_mfa_totp_enforce | bool
+  notify: Reload sshd
+  tags: [ssh, mfa]

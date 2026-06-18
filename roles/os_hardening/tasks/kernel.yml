@@ -10,3 +10,69 @@
 
 - name: "Kernel | sysctl jetzt anwenden"
   ansible.builtin.meta: flush_handlers
+
+# --- Kernel Lockdown (MI-3) ----------------------------------------------------
+# Kernel Lockdown LSM schränkt /dev/mem, /dev/kmem, kexec, Debug-Features usw. ein.
+# "integrity" = verhindert Modifikation des laufenden Kernels (kexec, /dev/mem).
+# "confidentiality" = wie integrity + verhindert Lesezugriff auf Kernel-Speicher.
+# Wird über GRUB-Cmdline gesetzt und wirkt NACH dem nächsten Reboot.
+- name: "Kernel | Lockdown: GRUB-Cmdline-Drop-in deployen"
+  ansible.builtin.copy:
+    dest: /etc/default/grub.d/99-anvil-lockdown.cfg
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # {{ ansible_managed }}
+      # Kernel Lockdown LSM (gesetzt via kernel_lockdown Variable)
+      GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT lockdown={{ kernel_lockdown }}"
+  when:
+    - kernel_lockdown is defined
+    - kernel_lockdown | length > 0
+  notify: Update grub
+  tags: [kernel, lockdown]
+
+- name: "Kernel | Lockdown: Hinweis"
+  ansible.builtin.debug:
+    msg: >-
+      kernel_lockdown='{{ kernel_lockdown }}' — wirkt NACH dem nächsten Reboot.
+      Prüfung: 'cat /sys/kernel/security/lockdown'
+  when:
+    - kernel_lockdown is defined
+    - kernel_lockdown | length > 0
+  tags: [kernel, lockdown]
+
+- name: "Kernel | Lockdown: Entfernen wenn deaktiviert"
+  ansible.builtin.file:
+    path: /etc/default/grub.d/99-anvil-lockdown.cfg
+    state: absent
+  when:
+    - kernel_lockdown is defined
+    - kernel_lockdown | length == 0
+  notify: Update grub
+  tags: [kernel, lockdown]
+
+# --- kernel.modules_disabled (MI-3, OPT-IN) ------------------------------------
+# ACHTUNG: kernel.modules_disabled=1 verhindert das Laden/Entladen ALLER
+# Kernel-Module nach dem Setzen. Kann ufw/nftables-Modulladen brechen.
+# Selbst nach Rücksetzen auf 0 bleibt der Wert bis zum Reboot bestehen.
+# Default: false (auch im crown-Modus).
+- name: "Kernel | Modules-Disabled: Warnung"
+  ansible.builtin.debug:
+    msg: >-
+      ⚠️ kernel_disable_module_loading=true AKTIVIERT! kernel.modules_disabled=1
+      verhindert das Laden/Entladen von Kernel-Modulen NACH dem Setzen.
+      Dies kann ufw, nftables und andere Dienste beeinträchtigen, die Module
+      laden. Ein Reboot ist zur Deaktivierung erforderlich.
+  when: kernel_disable_module_loading | bool
+  tags: [kernel, modules]
+
+- name: "Kernel | Modules-Disabled: sysctl setzen"
+  ansible.posix.sysctl:
+    name: kernel.modules_disabled
+    value: "1"
+    sysctl_set: true
+    reload: true
+    state: present
+  when: kernel_disable_module_loading | bool
+  tags: [kernel, modules]

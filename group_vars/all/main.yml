@@ -14,6 +14,27 @@ anvil_backup_dir: /var/backups/anvil
 anvil_log_dir: /var/log/anvil
 anvil_report_dir: "/var/log/anvil/reports"
 
+# --- Crown-Jewels-Posture -----------------------------------------------------
+# Schaltet zwischen "baseline" (Standard-Härtung) und "crown_jewels"
+# (Höchsthärtung für Kronjuwelen-Hosts) um. Siehe docs/crown-jewels.md.
+# Wird von config/anvil.conf via -e gesetzt; hier der Fallback-Default.
+anvil_posture: "baseline"
+
+# Abgeleiteter Bool für conditionals in Tasks.
+anvil_crown_jewels: "{{ anvil_posture == 'crown_jewels' }}"
+
+# Posture-getriebene Defaults (nur wo NICHT via -e gesetzt).
+# Diese Jinja-Ausdrücke greifen nur, wenn die Variable nicht bereits aus
+# config/anvil.conf via extra-vars stammt. (ssh_mfa_method und
+# firewall_egress_enforce stehen in ihren jeweiligen Abschnitten weiter unten.)
+enable_auditd_immutable: "{{ anvil_crown_jewels | bool }}"
+os_blacklist_usb_storage: "{{ anvil_crown_jewels | bool }}"
+apparmor_enforce_all: "{{ anvil_crown_jewels | bool }}"
+kernel_lockdown: "{{ 'confidentiality' if anvil_crown_jewels | bool else '' }}"
+kernel_disable_module_loading: false
+# Posture-Benachrichtigung: Erwähne im crown-Modus die aktivierten Maßnahmen.
+anvil_notify_posture: true
+
 # --- Admin-/Standard-User -----------------------------------------------------
 # Werden i.d.R. aus config/anvil.conf via -e gesetzt. Defaults hier als Fallback.
 admin_user: admin
@@ -57,6 +78,15 @@ ssh_host_key_algorithms:
 # Optionaler Dead-Man-Switch: rollt sshd_config nach N Minuten zurück, wenn
 # der Lauf nicht erfolgreich abschließt. 0 = deaktiviert.
 ssh_deadman_minutes: 0
+# SSH-Multi-Faktor: auto | none | fido2 | totp (via config/anvil.conf steuerbar).
+# "auto" = fido2 im crown-Modus, none im baseline-Modus.
+ssh_mfa_method: "auto"
+# TOTP-Enrollment-Bestätigung: erst auf true setzen, nachdem je Admin-User ein
+# Secret in /etc/users.oath angelegt wurde (oathtool). Sonst staged, kein Enforce.
+ssh_totp_enrolled: false
+# Optional: SSH-Zugriff auf IP/CIDR-Bereiche beschränken (Match Address).
+# Leeres Array = keine Einschränkung (Standard).
+ssh_allowed_cidrs: []
 
 # --- Firewall (ufw) -----------------------------------------------------------
 firewall_enabled: true
@@ -65,6 +95,16 @@ firewall_default_outgoing: allow
 firewall_ssh_rate_limit: true
 # Zusätzlich freizugebende Ports: [{port: 443, proto: tcp, comment: "https"}]
 firewall_extra_rules: []
+# Egress-Firewall (NW-1): default allow in both postures. Erst bei bewusster
+# Aktivierung (firewall_egress_enforce=true) wird egress auf deny-with-allowlist
+# umgestellt. Die Allowlist deckt DNS, NTP, HTTPS sowie Remote-Syslog ab.
+firewall_egress_enforce: false
+firewall_egress_allow:
+  - {port: 53, proto: udp, comment: "dns"}
+  - {port: 53, proto: tcp, comment: "dns-tcp"}
+  - {port: 123, proto: udp, comment: "ntp"}
+  - {port: 80, proto: tcp, comment: "http"}
+  - {port: 443, proto: tcp, comment: "https"}
 
 # --- Zeitsynchronisation (chrony) ---------------------------------------------
 time_sync_enabled: true
@@ -108,12 +148,12 @@ notify_on_run_success: true
 os_hardening_enabled: true
 enable_apparmor: true
 enable_auditd: true
-enable_auditd_immutable: false       # -e 2: Regeln bis Reboot unveränderbar
+# enable_auditd_immutable + os_blacklist_usb_storage: posture-getrieben oben
+# im Crown-Jewels-Abschnitt definiert (Default false in baseline).
 enable_aide: true
 enable_fail2ban: true
 enable_auto_updates: true
 enable_forensics: false              # rkhunter + Process-Accounting
-os_blacklist_usb_storage: false      # USB-Massenspeicher sperren (Vorsicht bei Bare-Metal)
 os_disable_ipv6: false
 
 # PAM / Passwort-Policy

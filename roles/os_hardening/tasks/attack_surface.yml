@@ -1,0 +1,124 @@
+---
+# =============================================================================
+# roles/os_hardening/tasks/attack_surface.yml — Angriffsfläche erfassen (H)
+#
+# Erfasst die aktuelle Angriffsfläche des Hosts: lauschende Sockets, aktive
+# systemd-Units, und meldet sie als Report (lokal + Gotify). Optionales
+# Maskieren von Diensten über os_mask_services.
+#
+# Achtung: Das aggressive Maskieren unerwarteter Dienste ist BEWUSST NICHT
+# Standard — Anvil priorisiert Sichtbarkeit vor Automatisierung, da falsch-
+# positive Maskierungen (z.B. ufw/nftables-Module) den Betrieb stören können.
+# Per-Service-Sandboxing folgt in Phase 3 (App-Overlays).
+# =============================================================================
+
+- name: "Attack | Report-Verzeichnis sicherstellen"
+  ansible.builtin.file:
+    path: "{{ anvil_report_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  tags: [os, attack_surface]
+
+- name: "Attack | Lauschende Sockets erfassen (ss -tulpn)"
+  ansible.builtin.shell:
+    executable: /bin/bash
+    cmd: |
+      set -euo pipefail
+      echo "=== Listening Sockets ($(date -Isec)) ==="
+      ss -tulpn
+      echo ""
+      echo "=== Established Connections ==="
+      ss -tupn state established
+  register: anvil_attack_ss
+  changed_when: false
+  failed_when: false
+  tags: [os, attack_surface]
+
+- name: "Attack | Aktive systemd-Units erfassen"
+  ansible.builtin.shell:
+    executable: /bin/bash
+    cmd: |
+      set -euo pipefail
+      echo "=== Active Services ($(date -Isec)) ==="
+      systemctl list-units --type=service --state=running --no-pager --no-legend | awk '{print $1, $3, $4}'
+      echo ""
+      echo "=== Failed Services ==="
+      systemctl list-units --type=service --state=failed --no-pager --no-legend || true
+  register: anvil_attack_units
+  changed_when: false
+  failed_when: false
+  tags: [os, attack_surface]
+
+- name: "Attack | Report schreiben"
+  ansible.builtin.copy:
+    dest: "{{ anvil_report_dir }}/attack-surface-{{ ansible_facts['date_time'].iso8601_basic_short | default('%Y%m%dT%H%M%S') }}.txt"
+    owner: root
+    group: root
+    mode: "0640"
+    content: |
+      =====================================================================
+      Anvil — Attack Surface Report
+      Host: {{ ansible_facts['hostname'] | default('(unknown)') }}
+      Datum: {{ ansible_facts['date_time'].iso8601 | default('(unknown)') }}
+      Posture: {{ anvil_posture }}
+      =====================================================================
+
+      {{ anvil_attack_ss.stdout | default('(ss nicht ausführbar)') }}
+
+      {{ anvil_attack_units.stdout | default('(systemd nicht ausführbar)') }}
+
+      === Aktive nicht-standard Ports (ss -tulpn, Kurzfassung) ===
+      {% if anvil_attack_ss.stdout_lines is defined %}
+      {% for line in anvil_attack_ss.stdout_lines if 'LISTEN' in line %}
+      {{ line }}
+      {% endfor %}
+      {% endif %}
+
+      === Posture-Aktivierungen ===
+      {% if anvil_crown_jewels | bool %}
+      - apparmor_enforce_all: {{ apparmor_enforce_all }}
+      - kernel_lockdown: {{ kernel_lockdown | default('(nicht gesetzt)') }}
+      - enable_auditd_immutable: {{ enable_auditd_immutable }}
+      - os_blacklist_usb_storage: {{ os_blacklist_usb_storage }}
+      - ssh_mfa_method: {{ ssh_mfa_effective | default(ssh_mfa_method) }}
+      {% endif %}
+      - firewall_egress_enforce: {{ firewall_egress_enforce }}
+      - enable_grub_password: {{ enable_grub_password }}
+  when: not ansible_check_mode
+  tags: [os, attack_surface]
+
+- name: "Attack | Gotify-Benachrichtigung (Zusammenfassung)"
+  ansible.builtin.command:
+    cmd: >-
+      /usr/local/bin/anvil-notify
+      --priority {{ notify_priority_info }}
+      --title "Attack Surface"
+      "{{ ansible_facts['hostname'] | default('host') }} — Posture={{ anvil_posture }},
+      lauschende Sockets erfasst, Report in {{ anvil_report_dir }}"
+  changed_when: false
+  failed_when: false
+  when:
+    - not ansible_check_mode
+    - notify_enabled | bool
+  tags: [os, attack_surface]
+
+# --- Optionales Maskieren von Diensten ---------------------------------------
+- name: "Attack | Dienste maskieren (os_mask_services)"
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+    masked: true
+  loop: "{{ os_mask_services | default([]) }}"
+  when:
+    - os_mask_services | default([]) | length > 0
+    - not ansible_check_mode
+  tags: [os, attack_surface]
+
+- name: "Attack | Report-Pfad als Fact setzen"
+  ansible.builtin.set_fact:
+    anvil_attack_report: "{{ anvil_report_dir }}/attack-surface-{{ ansible_facts['date_time'].iso8601_basic_short | default('%Y%m%dT%H%M%S') }}.txt"
+  when: not ansible_check_mode
+  tags: [os, attack_surface]

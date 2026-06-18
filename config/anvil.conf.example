@@ -24,6 +24,13 @@ ADMIN_PUBKEYS=(
 # --- SSH ----------------------------------------------------------------------
 SSH_PORT=22
 
+# --- Posture (siehe docs/crown-jewels.md) --------------------------------------
+# "baseline" (Standard-Härtung) oder "crown_jewels" (Höchsthärtung).
+ANVIL_POSTURE="baseline"
+
+# SSH-Multi-Faktor: "auto" (crown→fido2/baseline→none), "none", "fido2", "totp".
+ANVIL_SSH_MFA="auto"
+
 # --- Feature-Toggles (übersteuern group_vars/all/main.yml) --------------------
 ENABLE_FAIL2BAN=true
 ENABLE_AIDE=true

@@ -1,4 +1,11 @@
 ---
+- name: "AppArmor | apparmor-utils installieren (für aa-enforce)"
+  ansible.builtin.apt:
+    name: apparmor-utils
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
 - name: "AppArmor | Dienst aktivieren und starten"
   ansible.builtin.systemd_service:
     name: apparmor
@@ -13,8 +20,57 @@
   failed_when: false
   when: not ansible_check_mode
 
-- name: "AppArmor | Hinweis zum Enforce-Modus"
+- name: "AppArmor | Status-Info"
+  ansible.builtin.debug:
+    msg: "AppArmor aktiv — {{ anvil_aa_status.stdout_lines[0] | default('Status unbekannt') }}"
+  when: not ansible_check_mode
+
+# --- Crown-Jewels: complain-Profile in den Enforce-Modus setzen ---------------
+# Nur Profile, die aktuell im complain-Modus sind, werden enforced (idempotent:
+# beim zweiten Lauf ist die Liste leer -> changed=0). aa-status --json liefert
+# je Profil den Modus (apparmor 3.x, Ubuntu 22.04+).
+- name: "AppArmor | Enforce: Status als JSON lesen"
+  ansible.builtin.command: aa-status --json
+  register: anvil_aa_json
+  changed_when: false
+  failed_when: false
+  when:
+    - apparmor_enforce_all | bool
+    - not ansible_check_mode
+  tags: [apparmor]
+
+- name: "AppArmor | Enforce: complain-Profile bestimmen"
+  ansible.builtin.set_fact:
+    anvil_aa_complain: >-
+      {{ (anvil_aa_json.stdout | from_json).profiles | dict2items
+         | selectattr('value', 'equalto', 'complain') | map(attribute='key') | list }}
+  when:
+    - apparmor_enforce_all | bool
+    - not ansible_check_mode
+    - anvil_aa_json.stdout | default('') is search('^\\s*{')
+  tags: [apparmor]
+
+- name: "AppArmor | Enforce: complain-Profile in enforce-Modus setzen"
+  ansible.builtin.command: "aa-enforce {{ item }}"
+  loop: "{{ anvil_aa_complain | default([]) }}"
+  changed_when: true
+  failed_when: false
+  when:
+    - apparmor_enforce_all | bool
+    - not ansible_check_mode
+    - anvil_aa_complain | default([]) | length > 0
+  tags: [apparmor]
+
+- name: "AppArmor | Enforce: Ergebnis"
+  ansible.builtin.debug:
+    msg: "AppArmor enforce: {{ anvil_aa_complain | default([]) | length }} Profil(e) von complain → enforce gesetzt."
+  when: apparmor_enforce_all | bool
+  tags: [apparmor]
+
+- name: "AppArmor | Hinweis zu apparmor_enforce_all"
   ansible.builtin.debug:
     msg: >-
-      AppArmor aktiv. Profile gezielt in den enforce-Modus setzen mit
-      'aa-enforce /etc/apparmor.d/<profil>' (bewusst, um keine Dienste zu brechen).
+      apparmor_enforce_all={{ apparmor_enforce_all }} — setzt alle vorhandenen
+      AppArmor-Profile in den enforce-Modus. Bei Problemen einzelnen Dienst
+      mit 'aa-complain /etc/apparmor.d/<profil>' wieder in den complain-Modus
+      versetzen.

@@ -7,11 +7,18 @@ AddressFamily {{ 'inet' if os_disable_ipv6 | bool else 'any' }}
 # --- Authentifizierung -------------------------------------------------------
 PermitRootLogin {{ ssh_permit_root_login }}
 PasswordAuthentication {{ ssh_password_authentication }}
-KbdInteractiveAuthentication no
-ChallengeResponseAuthentication no
+KbdInteractiveAuthentication {{ 'yes' if ssh_mfa_totp_enforce | default(false) | bool else 'no' }}
+ChallengeResponseAuthentication {{ 'yes' if ssh_mfa_totp_enforce | default(false) | bool else 'no' }}
 PubkeyAuthentication yes
 PermitEmptyPasswords no
+{% if ssh_mfa_totp_enforce | default(false) | bool %}
+AuthenticationMethods publickey,keyboard-interactive
+{% elif ssh_mfa_fido2_enforce | default(false) | bool %}
 AuthenticationMethods publickey
+PubkeyAcceptedAlgorithms sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com
+{% else %}
+AuthenticationMethods publickey
+{% endif %}
 UsePAM yes
 
 # --- Zugriffskontrolle -------------------------------------------------------
@@ -42,3 +49,5 @@ KexAlgorithms {{ ssh_kex_algorithms | join(',') }}
 Ciphers {{ ssh_ciphers | join(',') }}
 MACs {{ ssh_macs | join(',') }}
 HostKeyAlgorithms {{ ssh_host_key_algorithms | join(',') }}
+{# Quell-Beschränkung (ssh_allowed_cidrs) erfolgt auf Firewall-Ebene (ufw from_ip),
+   nicht via sshd Match — das vermeidet ein versehentliches Lockern der MFA. #}

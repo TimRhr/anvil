@@ -20,3 +20,9 @@ vault_gotify_token: "AxxxxxxxxxxxxxX"
 # --- GRUB-Bootloader-Passwort (nur wenn enable_grub_password=true) ------------
 # Klartext-Passwort; Anvil erzeugt daraus den PBKDF2-Hash für grub.cfg.
 vault_grub_password: "EinStarkesGrubPasswort!"
+
+# --- Admin-Passwort-Hash (Crown-Jewels-Posture, sudo PR-2) --------------------
+# Wird benötigt, wenn admin_sudo_nopasswd=false (Default) in der crown_jewels-
+# Posture. Erzeuge den Hash mit: mkpasswd -m sha-512
+# (aus der whois/postfix-Paketfamilie). Leer lassen, wenn NOPASSWD aktiv ist.
+# admin_password_hash: "$6$xxxxxxxx..."

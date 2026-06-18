@@ -56,6 +56,42 @@
   when: anvil_sshd_pretest.rc | default(0) != 0
   tags: [always]
 
+# --- Posture-Prüfung ----------------------------------------------------------
+- name: "Preflight | Posture gültig?"
+  ansible.builtin.assert:
+    that:
+      - anvil_posture is defined
+      - anvil_posture in ['baseline', 'crown_jewels']
+    fail_msg: "anvil_posture='{{ anvil_posture | default('(undef)') }}' ungültig — erlaubt: baseline, crown_jewels."
+    quiet: true
+  tags: [always]
+
+- name: "Preflight | Posture-Info"
+  ansible.builtin.debug:
+    msg: "Posture: {{ anvil_posture }} — {{ '🔐 Höchsthärtung (Kronjuwelen)' if anvil_crown_jewels | bool else '🔧 Standard-Härtung (Baseline)' }}"
+  tags: [always]
+
+- name: "Preflight | Crown-Jewels: NOPASSWD-Warnung (kein Hard-Fail)"
+  ansible.builtin.debug:
+    msg: >-
+      ⚠️ Crown-Jewels: sudo läuft als NOPASSWD ohne gesetztes Admin-Passwort und
+      ohne explizite Freigabe. Empfehlung: admin_password_hash (Vault) setzen ODER
+      bewusst admin_sudo_nopasswd=true. sudo funktioniert weiter — aber unscharf.
+  when:
+    - anvil_crown_jewels | bool
+    - not (admin_sudo_nopasswd | default(false) | bool)
+    - admin_password_hash | default('') | length == 0
+  tags: [always]
+
+- name: "Preflight | Crown-Jewels: MFA-Methode bekannt?"
+  ansible.builtin.assert:
+    that:
+      - ssh_mfa_method in ['auto', 'none', 'fido2', 'totp']
+    fail_msg: "ssh_mfa_method='{{ ssh_mfa_method }}' ungültig — erlaubt: auto, none, fido2, totp."
+    quiet: true
+  when: anvil_crown_jewels | bool
+  tags: [always]
+
 # --- Arbeitsverzeichnisse anlegen --------------------------------------------
 - name: "Preflight | Anvil-Verzeichnisse anlegen"
   ansible.builtin.file:

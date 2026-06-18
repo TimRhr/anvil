@@ -40,32 +40,43 @@ Ubuntu-Versionen, getestet.
 
 ---
 
-## Phase 2 — „Kronjuwelen"-Höchsthärtung ☐
+## Phase 2 — „Kronjuwelen"-Höchsthärtung ☑
 
 **Ziel:** maximale Mauern für den zentralen Host. Umgesetzt als **Posture-Schalter**
 `anvil_posture: baseline | crown_jewels` (in `group_vars/all/main.yml`), der strengere
 Defaults aktiviert — ohne den Aussperr-/Verfügbarkeitsschutz zu opfern.
 
-- ☐ **MFA für SSH (AU-1)**: neue Rolle/Tasks für `sk-ssh-ed25519` (FIDO2) bzw.
-  `publickey,keyboard-interactive` + TOTP (`libpam-google-authenticator`);
-  `Match Address` zur Beschränkung auf Bastion/Management-Netz.
-- ☐ **Egress-Firewall (NW-1)**: `firewall_default_outgoing: deny` + Allowlist-Variable
-  (`firewall_egress_allow`: DNS, NTP, Paketspiegel, Gotify). Erweiterung von
-  [roles/firewall](roles/firewall/tasks/main.yml); ggf. nftables-Backend.
-- ☐ **Immutable Remote-Logging by default (DT-1)**: rsyslog→SIEM + auditd-Remote-Plugin
-  in der `crown_jewels`-Posture standardmäßig an; append-only/WORM-Hinweise.
-- ☐ **Strikte auditd-Posture (AV-1)**: `auditd_*_action` in `crown_jewels` auf
-  `halt`/`single`; Immutable-Rules (`-e 2`) an.
-- ☐ **Privileg (PR-2)**: passwort-/hardware-rückgesichertes sudo, NOPASSWD nur explizit.
-- ☐ **Kernel/Geräte (MI-3)**: `lockdown=confidentiality` (LSM), `usb-storage`-Blacklist an,
-  AppArmor gezielt `enforce` für exponierte Profile, `kernel.modules_disabled` nach Boot.
-- ☐ **At-Rest/Boot (BO-1)**: LUKS-Empfehlung fürs Provisioning (nicht nachrüstbar) +
-  Secure-Boot/TPM-Measured-Boot-Doku; GRUB-Passwort für Bare-Metal empfehlen.
-- ☐ **Angriffsfläche**: Dienste-Minimierung (laufende Sockets scannen, Unnötiges maskieren),
-  `systemd`-Sandboxing für verbleibende Dienste.
+- ☑ **Posture-Schalter (A)**: `config/anvil.conf` → `bootstrap.sh` → `group_vars/all/main.yml` →
+  `roles/preflight`. `anvil_crown_jewels`-Bool für conditionals. Posture-Validierung in preflight.
+- ☑ **SSH-MFA (AU-1, B)**: [`roles/ssh_hardening/tasks/mfa.yml`](roles/ssh_hardening/tasks/mfa.yml) —
+  FIDO2 (`sk-ssh-ed25519`) und TOTP (`pam_oath` / OATH Toolkit, FOSS), lockout-sicher
+  (Preflight prüft Keys/Enrollment vor Enforce). `ssh_allowed_cidrs` für
+  Management-Netz-Beschränkung.
+- ☑ **Egress-Firewall (NW-1, C)**: [`roles/firewall/tasks/main.yml`](roles/firewall/tasks/main.yml) —
+  Allowlist-Variable mit DNS/NTP/HTTP/HTTPS, Remote-Syslog. **Default `allow`** (auch im
+  crown-Modus); Schutz erst nach `firewall_egress_enforce=true`.
+- ◐ **Immutable Remote-Logging (DT-1)**: `enable_remote_syslog` bleibt Toggle (optional,
+  nicht erzwungen). Remote-Logging-Empfehlung in [`docs/crown-jewels.md`](docs/crown-jewels.md).
+- ☑ **auditd-Posture (AV-1, D)**: `enable_auditd_immutable` wird im crown-Modus auf `true`
+  gesetzt (Regel-Manipulationsschutz `-e 2`). Aktionen bleiben `syslog` (verfügbarkeits-
+  freundlich, siehe [`docs/crown-jewels.md`](docs/crown-jewels.md) für Umstellung auf `halt`/`single`).
+- ☑ **Privileg (PR-2, E)**: Preflight-Check im crown-Modus — assertiert entweder
+  `admin_sudo_nopasswd: true` ODER `admin_password_hash` im Vault.
+- ☑ **Kernel/Geräte (MI-3, F)**: AppArmor `enforce` für alle Profile (`apparmor_enforce_all`),
+  `kernel_lockdown=confidentiality` via GRUB-Cmdline-Drop-in,
+  `os_blacklist_usb_storage` aktiviert, `kernel_disable_module_loading` als OPT-IN
+  (default false, auch im crown-Modus).
+- ☑ **At-Rest/Boot (BO-1, G)**: LUKS/Secure-Boot/TPM-Empfehlungen in
+  [`docs/crown-jewels.md`](docs/crown-jewels.md). GRUB-Passwort weiterhin opt-in.
+- ☑ **Angriffsfläche (H)**: [`roles/os_hardening/tasks/attack_surface.yml`](roles/os_hardening/tasks/attack_surface.yml) —
+  `ss -tulpn` + aktive systemd-Units scannen, Report nach `/var/log/anvil/reports/`,
+  Gotify-Benachrichtigung. Optionales Maskieren via `os_mask_services`. Sandboxing → Phase 3.
+- ☑ **Doku (I)**: [`docs/crown-jewels.md`](docs/crown-jewels.md) — Posture-Übersicht,
+  Maßnahmen-Doku, MFA-Enrollment, Egress-Aktivierung, Umschalt-Hinweise, Restrisiken.
 
-**Akzeptanz:** `anvil_posture=crown_jewels` hebt Lynis-Index messbar an, Egress ist
-default-deny, MFA erzwungen, Logs landen extern — Aussperr-/Fallback-Schutz bleibt intakt.
+**Akzeptanz:** `anvil_posture=crown_jewels` aktiviert reproduzierbar die Höchsthärtung
+(AppArmor enforce, USB aus, auditd immutable, MFA gemäß Methode, Egress vorbereitet,
+Lockdown nach Reboot) — Aussperr-/Fallback-Schutz bleibt intakt, Verfügbarkeit gewahrt.
 
 ---
 

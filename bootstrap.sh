@@ -154,7 +154,9 @@ build_extra_vars() {
   "kernel_panic_reboot_seconds": ${KERNEL_PANIC_REBOOT_SECONDS:-10},
   "kernel_keep_count": ${KERNEL_KEEP_COUNT:-2},
   "anvil_hostname": "${ANVIL_HOSTNAME:-}",
-  "timezone": "${ANVIL_TIMEZONE:-Europe/Berlin}"
+  "timezone": "${ANVIL_TIMEZONE:-Europe/Berlin}",
+  "anvil_posture": "${ANVIL_POSTURE:-baseline}",
+  "ssh_mfa_method": "${ANVIL_SSH_MFA:-auto}"
 }
 EOF
 }
