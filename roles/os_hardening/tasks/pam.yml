@@ -1,0 +1,45 @@
+---
+- name: "PAM | pwquality-Konfiguration"
+  ansible.builtin.template:
+    src: pwquality.conf.j2
+    dest: /etc/security/pwquality.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: "PAM | faillock-Parameter ablegen"
+  ansible.builtin.template:
+    src: faillock.conf.j2
+    dest: /etc/security/faillock.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+# --- faillock PAM-Integration (opt-in, Lockout-Risiko!) ----------------------
+- name: "PAM | faillock-Profil installieren (nur wenn os_pam_faillock=true)"
+  ansible.builtin.template:
+    src: pam-config-faillock.j2
+    dest: /usr/share/pam-configs/anvil-faillock
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Update PAM
+  when: os_pam_faillock | bool
+
+# --- pwhistory PAM-Integration -----------------------------------------------
+- name: "PAM | pwhistory-Profil installieren"
+  ansible.builtin.template:
+    src: pam-config-pwhistory.j2
+    dest: /usr/share/pam-configs/anvil-pwhistory
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Update PAM
+  when: os_pam_pwhistory | bool
+
+- name: "PAM | Warnung zu faillock-Lockout-Risiko"
+  ansible.builtin.debug:
+    msg: >-
+      ⚠️ os_pam_faillock=true aktiviert Account-Lockout über PAM. Vor Produktiveinsatz
+      Konsolen-/Recovery-Zugang sicherstellen (Lockout-Risiko). Siehe docs/runbook.md.
+  when: os_pam_faillock | bool

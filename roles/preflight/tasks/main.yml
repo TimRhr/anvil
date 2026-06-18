@@ -1,0 +1,102 @@
+---
+# =============================================================================
+# roles/preflight — Safety-Gate & Config-Backup
+#
+# Prüft VOR jeder Änderung alle Vorbedingungen, die einen Aussperr- oder
+# Bricked-Server verhindern, und sichert die bestehende Konfiguration.
+# =============================================================================
+
+- name: "Preflight | Als root/sudo ausgeführt?"
+  ansible.builtin.assert:
+    that: "ansible_user_id == 'root' or ansible_become | default(false)"
+    fail_msg: "Anvil muss mit root-Rechten laufen (sudo)."
+    quiet: true
+  tags: [always]
+
+- name: "Preflight | Unterstütztes Betriebssystem?"
+  ansible.builtin.assert:
+    that: "ansible_os_family == 'Debian'"
+    fail_msg: "Nicht unterstützt: {{ ansible_distribution }} {{ ansible_distribution_version }} — Anvil benötigt Debian/Ubuntu."
+    success_msg: "OS ok: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+    quiet: true
+  tags: [always]
+
+- name: "Preflight | Admin-User definiert und gültig?"
+  ansible.builtin.assert:
+    that:
+      - admin_user is defined
+      - admin_user | length > 0
+      - admin_user is match('^[a-z_][a-z0-9_-]*$')
+    fail_msg: "admin_user fehlt oder ist ungültig (config/anvil.conf prüfen)."
+    quiet: true
+  tags: [always]
+
+- name: "Preflight | Mindestens ein SSH-Public-Key vorhanden?"
+  ansible.builtin.assert:
+    that:
+      - admin_pubkeys is defined
+      - admin_pubkeys | length > 0
+      - admin_pubkeys | select('match', '^(ssh-ed25519|ssh-rsa|ecdsa-sha2-|sk-ssh-ed25519@|sk-ecdsa-sha2-)') | list | length > 0
+    fail_msg: >-
+      Kein gültiger SSH-Public-Key in admin_pubkeys. Ohne Key würdest du dich beim
+      Deaktivieren von Root-/Passwort-Login aussperren. Bitte config/anvil.conf füllen.
+    quiet: true
+  tags: [always]
+
+- name: "Preflight | Aktuelle sshd-Konfiguration ist syntaktisch gültig"
+  ansible.builtin.command: sshd -t
+  changed_when: false
+  failed_when: false
+  register: anvil_sshd_pretest
+  tags: [always]
+
+- name: "Preflight | Warnung bei bereits defekter sshd-Konfiguration"
+  ansible.builtin.debug:
+    msg: "⚠️ Bestehende sshd-Konfiguration meldet Fehler: {{ anvil_sshd_pretest.stderr | default('') }}"
+  when: anvil_sshd_pretest.rc | default(0) != 0
+  tags: [always]
+
+# --- Arbeitsverzeichnisse anlegen --------------------------------------------
+- name: "Preflight | Anvil-Verzeichnisse anlegen"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  loop:
+    - "{{ anvil_state_dir }}"
+    - "{{ anvil_backup_dir }}"
+    - "{{ anvil_log_dir }}"
+    - "{{ anvil_report_dir }}"
+  tags: [always]
+
+# --- Config-Backup ------------------------------------------------------------
+- name: "Preflight | Backup-Zeitstempel festlegen"
+  ansible.builtin.set_fact:
+    anvil_backup_set: "{{ anvil_backup_dir }}/{{ ansible_date_time.iso8601_basic_short }}"
+  tags: [always]
+
+- name: "Preflight | Bestehende Konfiguration sichern -> {{ anvil_backup_set }}"
+  ansible.builtin.shell:
+    executable: /bin/bash
+    cmd: |
+      set -euo pipefail
+      dest="{{ anvil_backup_set }}/files"
+      mkdir -p "$dest"
+      for f in {{ anvil_backup_files | join(' ') }}; do
+        if [ -e "$f" ]; then
+          mkdir -p "$dest$(dirname "$f")"
+          cp -a "$f" "$dest$f"
+        fi
+      done
+      # Liste aktiver Dienste & laufenden Kernel als Referenz mitsichern.
+      uname -r > "{{ anvil_backup_set }}/running-kernel.txt" 2>/dev/null || true
+  changed_when: false
+  when: not ansible_check_mode
+  tags: [always]
+
+- name: "Preflight | ✅ Vorbedingungen erfüllt"
+  ansible.builtin.debug:
+    msg: "Preflight ok — Backup unter {{ anvil_backup_set | default('(check-mode: übersprungen)') }}"
+  tags: [always]

@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+[Journal]
+Storage={{ 'persistent' if logging_journald_persistent | bool else 'auto' }}
+Compress=yes
+SystemMaxUse={{ logging_journald_max_use }}
+MaxRetentionSec={{ logging_journald_max_retention }}
+ForwardToSyslog={{ 'yes' if enable_remote_syslog | bool else 'no' }}
+Seal=yes
+RateLimitIntervalSec=30s
+RateLimitBurst=10000

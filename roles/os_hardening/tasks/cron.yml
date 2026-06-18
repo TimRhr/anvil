@@ -1,0 +1,28 @@
+---
+- name: "Cron | cron.allow-Whitelist (root + Admin)"
+  ansible.builtin.copy:
+    content: |
+      root
+      {{ admin_user }}
+    dest: /etc/cron.allow
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: "Cron | at.allow-Whitelist (root + Admin)"
+  ansible.builtin.copy:
+    content: |
+      root
+      {{ admin_user }}
+    dest: /etc/at.allow
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: "Cron | cron.deny/at.deny entfernen (Whitelist statt Blacklist)"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/cron.deny
+    - /etc/at.deny

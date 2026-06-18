@@ -1,0 +1,8 @@
+---
+- name: "Module | Blacklist für unsichere Kernel-Module"
+  ansible.builtin.template:
+    src: modprobe-blacklist.conf.j2
+    dest: /etc/modprobe.d/anvil-blacklist.conf
+    owner: root
+    group: root
+    mode: "0644"

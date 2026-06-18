@@ -1,0 +1,23 @@
+---
+- name: "Forensik | rkhunter und Process-Accounting installieren"
+  ansible.builtin.apt:
+    name:
+      - rkhunter
+      - acct
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: "Forensik | Process-Accounting aktivieren"
+  ansible.builtin.systemd_service:
+    name: acct
+    enabled: true
+    state: started
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: "Forensik | rkhunter-Baseline aktualisieren"
+  ansible.builtin.command: rkhunter --propupd --quiet
+  args:
+    creates: /var/lib/rkhunter/db/rkhunter.dat
+  when: not ansible_check_mode

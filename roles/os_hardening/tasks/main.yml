@@ -1,0 +1,89 @@
+---
+# =============================================================================
+# roles/os_hardening — Orchestrierung der OS-Härtung (BSI SYS.1.3 / CIS L1+L2)
+# Jede Datei deckt einen Bereich ab und ist über ihren Tag einzeln ausführbar.
+# =============================================================================
+
+- name: "OS | Pakete"
+  ansible.builtin.import_tasks: packages.yml
+  tags: [os, packages]
+
+- name: "OS | Kernel-/Netzwerk-sysctl"
+  ansible.builtin.import_tasks: kernel.yml
+  tags: [os, kernel]
+
+- name: "OS | Kernel-Module blockieren"
+  ansible.builtin.import_tasks: modules.yml
+  tags: [os, modules]
+
+- name: "OS | Dateisystem-Mounts härten"
+  ansible.builtin.import_tasks: filesystem.yml
+  when: os_harden_tmp_mounts | bool
+  tags: [os, fs]
+
+- name: "OS | Account-Hygiene"
+  ansible.builtin.import_tasks: accounts.yml
+  tags: [os, accounts]
+
+- name: "OS | login.defs / Passwort-Policy"
+  ansible.builtin.import_tasks: logindefs.yml
+  tags: [os, logindefs]
+
+- name: "OS | PAM (pwquality/faillock/pwhistory)"
+  ansible.builtin.import_tasks: pam.yml
+  tags: [os, pam]
+
+- name: "OS | Limits / Core-Dumps"
+  ansible.builtin.import_tasks: limits.yml
+  tags: [os, limits]
+
+- name: "OS | Shell-Härtung"
+  ansible.builtin.import_tasks: shell.yml
+  tags: [os, shell]
+
+- name: "OS | Kritische Dateirechte"
+  ansible.builtin.import_tasks: perms.yml
+  tags: [os, perms]
+
+- name: "OS | AppArmor"
+  ansible.builtin.import_tasks: apparmor.yml
+  when: enable_apparmor | bool
+  tags: [os, apparmor]
+
+- name: "OS | auditd"
+  ansible.builtin.import_tasks: auditd.yml
+  when: enable_auditd | bool
+  tags: [os, auditd]
+
+- name: "OS | AIDE (Integrität)"
+  ansible.builtin.import_tasks: aide.yml
+  when: enable_aide | bool
+  tags: [os, aide]
+
+- name: "OS | fail2ban"
+  ansible.builtin.import_tasks: fail2ban.yml
+  when: enable_fail2ban | bool
+  tags: [os, fail2ban]
+
+- name: "OS | unattended-upgrades"
+  ansible.builtin.import_tasks: updates.yml
+  when: enable_auto_updates | bool
+  tags: [os, updates]
+
+- name: "OS | Bootloader (GRUB-Passwort)"
+  ansible.builtin.import_tasks: bootloader.yml
+  when: enable_grub_password | bool
+  tags: [os, bootloader]
+
+- name: "OS | Forensik (rkhunter/acct)"
+  ansible.builtin.import_tasks: forensics.yml
+  when: enable_forensics | bool
+  tags: [os, forensics]
+
+- name: "OS | Banner / MOTD"
+  ansible.builtin.import_tasks: banner.yml
+  tags: [os, banner]
+
+- name: "OS | Cron-Zugriffskontrolle"
+  ansible.builtin.import_tasks: cron.yml
+  tags: [os, cron]

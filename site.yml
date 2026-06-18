@@ -1,0 +1,96 @@
+---
+# =============================================================================
+# site.yml — Anvil-Master-Playbook
+#
+# Läuft LOKAL auf dem Zielserver (Pull-Modell). Die Reihenfolge ist
+# sicherheitskritisch: Zugang sichern, BEVOR Root-/Passwort-Login deaktiviert
+# wird; Firewall-Freigabe vor "default deny"; Zeit & Logging vor Audit.
+#
+# Aufruf erfolgt über bootstrap.sh, direkt möglich mit:
+#   ansible-playbook -i inventory.ini site.yml -e @vars.json
+# =============================================================================
+
+- name: "Anvil — Server-Bootstrap & Hardening"
+  hosts: localhost
+  connection: local
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: "Anvil | Startzeitpunkt festhalten"
+      ansible.builtin.set_fact:
+        anvil_run_started: "{{ ansible_date_time.iso8601 }}"
+      tags: [always]
+
+  roles:
+    # 1. Safety-Gate + Config-Backup (verändert nichts Fachliches)
+    - role: preflight
+      tags: [always, preflight]
+
+    # 2. Benachrichtigung früh installieren, damit Folgeschritte melden können
+    - role: notify
+      tags: [notify]
+
+    # 3. Zugang sichern: Standard-User + Keys + sudo
+    - role: base_user
+      tags: [user, base_user]
+
+    # 4. ERST DANACH: Root-/Passwort-Login deaktivieren
+    - role: ssh_hardening
+      tags: [ssh, ssh_hardening]
+
+    # 5. Firewall
+    - role: firewall
+      when: firewall_enabled | bool
+      tags: [firewall]
+
+    # 6. Zeitsynchronisation (vor Logging/Audit für korrekte Timestamps)
+    - role: time_sync
+      when: time_sync_enabled | bool
+      tags: [time, time_sync]
+
+    # 7. Logging persistent + Retention
+    - role: logging
+      tags: [logging]
+
+    # 8. OS-Hardening (Kernel, PAM, Accounts, AIDE, auditd, …)
+    - role: os_hardening
+      when: os_hardening_enabled | bool
+      tags: [os, os_hardening]
+
+    # 9. Boot-Resilienz / Kernel-Fallback
+    - role: kernel_resilience
+      when: kernel_resilience_enabled | bool
+      tags: [kernel, kernel_resilience, kernel-fallback]
+
+    # 10. Audit / Compliance-Report
+    - role: audit
+      when: audit_lynis_enabled | bool
+      tags: [audit]
+
+  post_tasks:
+    - name: "Anvil | Abschluss-Benachrichtigung (Gotify)"
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/anvil-notify
+          - "--priority"
+          - "{{ notify_priority_info }}"
+          - "--title"
+          - "Anvil-Lauf erfolgreich"
+          - "Härtung auf {{ inventory_hostname }} abgeschlossen ({{ anvil_run_started }})."
+      register: anvil_notify_done
+      changed_when: false
+      failed_when: false
+      when:
+        - notify_enabled | bool
+        - notify_on_run_success | bool
+        - not ansible_check_mode
+      tags: [always]
+
+    - name: "Anvil | ✅ Fertig"
+      ansible.builtin.debug:
+        msg:
+          - "✅ Anvil abgeschlossen auf {{ inventory_hostname }}"
+          - "Admin-User: {{ admin_user }} (Key-Login), Root-Login deaktiviert."
+          - "Backups: {{ anvil_backup_dir }} | Logs: {{ anvil_log_dir }}"
+      tags: [always]

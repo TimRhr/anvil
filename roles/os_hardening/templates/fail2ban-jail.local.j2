@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+[DEFAULT]
+bantime  = {{ fail2ban_bantime }}
+findtime = {{ fail2ban_findtime }}
+maxretry = {{ fail2ban_maxretry }}
+backend  = systemd
+# Gotify-Benachrichtigung bei jedem Ban (zusätzlich zur Standard-Action)
+action = %(action_)s
+         anvil-gotify[name=%(__name__)s]
+
+[sshd]
+enabled  = true
+port     = {{ ssh_port }}

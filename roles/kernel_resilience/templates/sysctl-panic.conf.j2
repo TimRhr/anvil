@@ -1,0 +1,4 @@
+# {{ ansible_managed }}
+# Anvil — automatischer Reboot bei Kernel-Panik (Voraussetzung für Fallback)
+kernel.panic = {{ kernel_panic_reboot_seconds }}
+kernel.panic_on_oops = {{ kernel_panic_on_oops }}

@@ -1,0 +1,6 @@
+---
+# Optionaler gehashter Passwort-String für den Admin-User (z.B. aus dem Vault
+# als vault_admin_password). Wird er gesetzt, verlangt sudo ein Passwort.
+# Ist er leer und admin_sudo_nopasswd=false, fällt Anvil auf NOPASSWD zurück
+# (mit Warnung), damit ein Key-only-Admin überhaupt sudo nutzen kann.
+admin_password_hash: "{{ vault_admin_password | default('') }}"

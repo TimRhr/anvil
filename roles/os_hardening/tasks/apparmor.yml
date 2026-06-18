@@ -1,0 +1,20 @@
+---
+- name: "AppArmor | Dienst aktivieren und starten"
+  ansible.builtin.systemd_service:
+    name: apparmor
+    enabled: true
+    state: started
+  when: not ansible_check_mode
+
+- name: "AppArmor | Status auslesen"
+  ansible.builtin.command: aa-status --json
+  register: anvil_aa_status
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: "AppArmor | Hinweis zum Enforce-Modus"
+  ansible.builtin.debug:
+    msg: >-
+      AppArmor aktiv. Profile gezielt in den enforce-Modus setzen mit
+      'aa-enforce /etc/apparmor.d/<profil>' (bewusst, um keine Dienste zu brechen).

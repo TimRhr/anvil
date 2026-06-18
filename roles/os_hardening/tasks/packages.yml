@@ -1,0 +1,16 @@
+---
+- name: "Pakete | apt-Cache aktualisieren"
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: "Pakete | Sicherheits-/Härtungspakete installieren"
+  ansible.builtin.apt:
+    name: "{{ os_packages_install }}"
+    state: present
+
+- name: "Pakete | Unsichere/überflüssige Pakete entfernen"
+  ansible.builtin.apt:
+    name: "{{ os_packages_remove }}"
+    state: absent
+    purge: true

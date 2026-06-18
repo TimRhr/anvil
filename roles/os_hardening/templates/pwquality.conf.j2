@@ -1,0 +1,15 @@
+# {{ ansible_managed }}
+# Anvil Passwortqualität (libpam-pwquality / CIS 5.4)
+minlen = {{ pam_pwquality_minlen }}
+minclass = {{ pam_pwquality_minclass }}
+dcredit = -1
+ucredit = -1
+ocredit = -1
+lcredit = -1
+maxrepeat = 3
+maxsequence = 3
+gecoscheck = 1
+dictcheck = 1
+enforcing = 1
+# root ebenfalls den Regeln unterwerfen
+enforce_for_root

@@ -1,0 +1,28 @@
+# Anvil — Dateien, die NIEMALS ins Git gehören
+# -----------------------------------------------------------------------------
+
+# Vault-Passwort-Datei (Klartext-Passwort für ansible-vault)
+.vault_pass
+.vault_pass.*
+
+# Echte Secrets — nur die *.example-Vorlagen werden versioniert.
+# group_vars/all/vault.yml ist mit ansible-vault verschlüsselt und DARF
+# committet werden; die unverschlüsselte Vorlage nicht:
+group_vars/all/vault.plain.yml
+
+# Lokale, host-spezifische Override-Konfiguration
+config/anvil.local.conf
+
+# Laufzeit-Artefakte (entstehen nur auf dem Zielserver)
+/var/
+reports/
+*.log
+*.retry
+
+# Ansible-Collections, falls lokal installiert
+collections/
+
+# Editor-/OS-Müll
+*.swp
+*~
+.DS_Store

@@ -1,0 +1,14 @@
+---
+# Ansible-Collections, die Anvil benötigt.
+#
+# Auf dem Zielserver bringt das apt-Paket "ansible" diese Collections bereits
+# in einer zueinander passenden Version mit. bootstrap.sh installiert von hier
+# nur nach, falls sie fehlen (z.B. bei reinem ansible-core). Für CI werden sie
+# explizit installiert: ansible-galaxy collection install -r requirements.yml -p collections/
+collections:
+  - name: community.general    # ufw, timezone
+    version: ">=7.0.0"
+  - name: ansible.posix        # mount, sysctl, authorized_key
+    version: ">=1.5.0"
+
+roles: []

@@ -1,0 +1,12 @@
+[Unit]
+Description=Anvil Continuous Enforcement (Pull + Hardening)
+Documentation=https://example.invalid/anvil
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/anvil/pull-env
+ExecStart=/usr/local/sbin/anvil-pull-run
+Nice=10
+TimeoutStartSec=1800

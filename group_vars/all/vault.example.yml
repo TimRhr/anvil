@@ -1,0 +1,22 @@
+---
+# =============================================================================
+# group_vars/all/vault.example.yml — Vorlage für verschlüsselte Secrets
+#
+# So einrichten:
+#   cp group_vars/all/vault.example.yml group_vars/all/vault.yml
+#   $EDITOR group_vars/all/vault.yml          # echte Werte eintragen
+#   ansible-vault encrypt group_vars/all/vault.yml
+#
+# Optional Vault-Passwort in ./.vault_pass ablegen (chmod 600) — bootstrap.sh
+# nutzt es dann automatisch. .vault_pass NIEMALS committen!
+# =============================================================================
+
+# --- Gotify-Benachrichtigungen ------------------------------------------------
+# Basis-URL des Gotify-Servers (ohne abschließenden Slash).
+vault_gotify_url: "https://gotify.example.com"
+# Application-Token (in Gotify pro App erzeugt).
+vault_gotify_token: "AxxxxxxxxxxxxxX"
+
+# --- GRUB-Bootloader-Passwort (nur wenn enable_grub_password=true) ------------
+# Klartext-Passwort; Anvil erzeugt daraus den PBKDF2-Hash für grub.cfg.
+vault_grub_password: "EinStarkesGrubPasswort!"

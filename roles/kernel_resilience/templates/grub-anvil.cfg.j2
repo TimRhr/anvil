@@ -1,0 +1,9 @@
+# {{ ansible_managed }}
+# Anvil Boot-Resilienz — GRUB so konfigurieren, dass headless immer durchbootet
+# und der Default-Eintrag von Anvil verwaltet wird (Known-Good-Kernel).
+GRUB_DEFAULT=saved
+GRUB_SAVEDEFAULT=false
+GRUB_TIMEOUT={{ grub_timeout | default(5) }}
+GRUB_TIMEOUT_STYLE=menu
+# Nach einem Fehlboot NICHT unendlich im Menü hängen (Server ohne Tastatur):
+GRUB_RECORDFAIL_TIMEOUT={{ grub_recordfail_timeout | default(5) }}

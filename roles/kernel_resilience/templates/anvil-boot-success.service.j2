@@ -1,0 +1,15 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Anvil Boot-Assessment (Kernel-Fallback-Erkennung)
+After=network-online.target {{ boot_success_required_units | join(' ') }}
+Wants=network-online.target
+ConditionPathExists=/usr/local/sbin/anvil-boot-assess
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=/bin/sleep {{ boot_success_settle_seconds }}
+ExecStart=/usr/local/sbin/anvil-boot-assess
+
+[Install]
+WantedBy=multi-user.target

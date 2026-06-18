@@ -1,0 +1,17 @@
+---
+# Molecule-Converge: wendet die Anvil-Härtung im Container an.
+# Hinweis: In Containern werden kernel_resilience/firewall/auditd teils
+# übersprungen (kein eigener Kernel/keine Netfilter). Fokus: Idempotenz der
+# konfigurationslastigen Rollen.
+- name: Converge
+  ansible.builtin.import_playbook: ../../../site.yml
+  vars:
+    admin_user: molecule
+    admin_pubkeys:
+      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITESTKEYTESTKEYTESTKEYTESTKEYTEST molecule@ci"
+    notify_enabled: false
+    firewall_enabled: false
+    kernel_resilience_enabled: false
+    enable_auditd: false
+    enable_aide: false
+    audit_lynis_enabled: false

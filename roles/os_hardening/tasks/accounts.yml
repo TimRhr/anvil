@@ -1,0 +1,50 @@
+---
+- name: "Accounts | su per pam_wheel beschränken auf Gruppe {{ os_su_group }}"
+  ansible.builtin.lineinfile:
+    path: /etc/pam.d/su
+    regexp: '^#?\s*auth\s+required\s+pam_wheel\.so'
+    line: "auth required pam_wheel.so use_uid group={{ os_su_group }}"
+    insertafter: '^#%PAM'
+  when: os_restrict_su | bool
+
+- name: "Accounts | Inaktivitäts-Sperre für neue Accounts (30 Tage)"
+  ansible.builtin.lineinfile:
+    path: /etc/default/useradd
+    regexp: '^INACTIVE='
+    line: "INACTIVE=30"
+
+- name: "Accounts | Auf weitere UID-0-Konten neben root prüfen"
+  ansible.builtin.shell:
+    executable: /bin/bash
+    cmd: "awk -F: '($3 == 0 && $1 != \"root\") {print $1}' /etc/passwd"
+  register: anvil_uid0
+  changed_when: false
+
+- name: "Accounts | Alarm bei zusätzlichem UID-0-Konto"
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/anvil-notify
+      - "--priority"
+      - "{{ notify_priority_alert }}"
+      - "--title"
+      - "Sicherheitsbefund: UID-0-Konto"
+      - "Neben root existieren weitere Konten mit UID 0: {{ anvil_uid0.stdout_lines | join(', ') }}"
+  changed_when: false
+  failed_when: false
+  when:
+    - not ansible_check_mode
+    - anvil_uid0.stdout | length > 0
+
+- name: "Accounts | Auf Konten mit leerem Passwort prüfen"
+  ansible.builtin.shell:
+    executable: /bin/bash
+    cmd: "awk -F: '($2 == \"\") {print $1}' /etc/shadow"
+  register: anvil_empty_pw
+  changed_when: false
+
+- name: "Accounts | Konten mit leerem Passwort sperren"
+  ansible.builtin.user:
+    name: "{{ item }}"
+    password_lock: true
+  loop: "{{ anvil_empty_pw.stdout_lines }}"
+  when: anvil_empty_pw.stdout | length > 0

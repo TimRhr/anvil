@@ -1,0 +1,13 @@
+Name: Anvil account lockout (faillock)
+Default: yes
+Priority: 0
+Auth-Type: Primary
+Auth:
+	[default=die]	pam_faillock.so authfail
+	sufficient	pam_faillock.so authsucc
+Auth-Initial:
+	[default=die]	pam_faillock.so authfail
+	sufficient	pam_faillock.so authsucc
+Account-Type: Primary
+Account:
+	required	pam_faillock.so

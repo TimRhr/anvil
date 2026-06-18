@@ -1,0 +1,91 @@
+---
+# =============================================================================
+# roles/os_hardening — Defaults
+# =============================================================================
+
+# Zu installierende Härtungs-/Sicherheitspakete
+os_packages_install:
+  - auditd
+  - audispd-plugins
+  - aide
+  - aide-common
+  - fail2ban
+  - unattended-upgrades
+  - apt-listchanges
+  - libpam-pwquality
+  - apparmor
+  - apparmor-utils
+  - apparmor-profiles
+  - acl
+  - sudo
+  - curl
+
+# Unsichere/überflüssige Pakete entfernen
+os_packages_remove:
+  - telnet
+  - rsh-client
+  - rsh-redone-client
+  - nis
+  - talk
+  - ldap-utils
+  - xinetd
+
+# sysctl-Härtung (Netzwerk + Kernel)
+os_sysctl_settings:
+  # Netzwerk
+  net.ipv4.conf.all.rp_filter: 1
+  net.ipv4.conf.default.rp_filter: 1
+  net.ipv4.conf.all.accept_redirects: 0
+  net.ipv4.conf.default.accept_redirects: 0
+  net.ipv4.conf.all.secure_redirects: 0
+  net.ipv4.conf.all.send_redirects: 0
+  net.ipv4.conf.default.send_redirects: 0
+  net.ipv4.conf.all.accept_source_route: 0
+  net.ipv4.conf.default.accept_source_route: 0
+  net.ipv4.conf.all.log_martians: 1
+  net.ipv4.icmp_echo_ignore_broadcasts: 1
+  net.ipv4.icmp_ignore_bogus_error_responses: 1
+  net.ipv4.tcp_syncookies: 1
+  net.ipv6.conf.all.accept_redirects: 0
+  net.ipv6.conf.default.accept_redirects: 0
+  net.ipv6.conf.all.accept_source_route: 0
+  # Kernel
+  kernel.randomize_va_space: 2
+  kernel.kptr_restrict: 2
+  kernel.dmesg_restrict: 1
+  kernel.yama.ptrace_scope: 1
+  kernel.sysrq: 0
+  kernel.core_uses_pid: 1
+  kernel.perf_event_paranoid: 3
+  fs.suid_dumpable: 0
+  fs.protected_hardlinks: 1
+  fs.protected_symlinks: 1
+  fs.protected_fifos: 2
+  fs.protected_regular: 2
+
+# Kernel-Module, die blockiert werden (selten genutzte/unsichere Dateisysteme & Protokolle)
+os_module_blacklist:
+  - cramfs
+  - freevxfs
+  - jffs2
+  - hfs
+  - hfsplus
+  - squashfs
+  - udf
+  - dccp
+  - sctp
+  - rds
+  - tipc
+
+# PAM-Integration für Account-Lockout (faillock). Standard AUS, da fehlerhafte
+# PAM-Konfiguration Logins komplett sperren kann (Lockout-Risiko). Bewusst opt-in.
+os_pam_faillock: false
+# pam_pwhistory (Passwort-Wiederverwendung verhindern) — geringeres Risiko.
+os_pam_pwhistory: true
+
+# Dateisystem: /tmp und /var/tmp härten, falls sie eigene Mountpoints sind.
+os_harden_tmp_mounts: true
+
+# su auf Mitglieder der sudo-Gruppe beschränken
+os_restrict_su: true
+os_su_group: sudo

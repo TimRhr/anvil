@@ -1,0 +1,7 @@
+---
+# Reload (kein Restart!), damit bestehende SSH-Sitzungen erhalten bleiben.
+- name: Reload sshd
+  ansible.builtin.service:
+    name: ssh
+    state: reloaded
+  when: not ansible_check_mode

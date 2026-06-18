@@ -1,0 +1,11 @@
+# {{ ansible_managed }}
+# sudo-Rechte für den Anvil-Admin-User {{ admin_user }}
+{% if _admin_effective_nopasswd %}
+# NOPASSWD: kein Admin-Passwort gesetzt — SSH-Key ist der alleinige Faktor.
+{{ admin_user }} ALL=(ALL) NOPASSWD: ALL
+{% else %}
+# Passwortgeschütztes sudo (admin_password_hash ist gesetzt).
+{{ admin_user }} ALL=(ALL) ALL
+{% endif %}
+Defaults:{{ admin_user }} timestamp_timeout=5, timestamp_type=tty
+Defaults:{{ admin_user }} logfile="/var/log/sudo.log"

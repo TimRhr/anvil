@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Anvil — täglicher AIDE-Integritätscheck mit Gotify-Meldung bei Änderungen.
+set -uo pipefail
+
+LOGDIR=/var/log/aide
+LOG="$LOGDIR/aide-check.log"
+mkdir -p "$LOGDIR"
+
+command -v aide >/dev/null 2>&1 || exit 0
+
+rc=0
+out="$(aide --check 2>&1)" || rc=$?
+printf '%s\n' "$out" >"$LOG"
+
+if [[ "$rc" -ne 0 ]]; then
+  summary="$(printf '%s\n' "$out" | grep -E '^(Added|Removed|Changed)' | head -n 20)"
+  /usr/local/bin/anvil-notify --priority 6 --title "AIDE: Dateiänderungen erkannt" \
+    "AIDE meldet Änderungen am Dateisystem:
+${summary:-(Details siehe Report)}
+Voller Report: $LOG"
+fi
+exit 0

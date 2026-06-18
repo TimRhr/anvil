@@ -1,0 +1,7 @@
+[Unit]
+Description=Anvil — Gotify-Meldung nach unattended-upgrades
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/anvil-upgrade-notify
+Nice=10

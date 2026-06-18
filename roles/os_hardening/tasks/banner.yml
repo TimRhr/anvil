@@ -1,0 +1,16 @@
+---
+- name: "Banner | /etc/issue (lokales Login)"
+  ansible.builtin.copy:
+    src: issue
+    dest: /etc/issue
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: "Banner | /etc/motd zurücksetzen (keine System-Infos preisgeben)"
+  ansible.builtin.copy:
+    content: ""
+    dest: /etc/motd
+    owner: root
+    group: root
+    mode: "0644"

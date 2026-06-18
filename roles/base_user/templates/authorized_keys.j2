@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+# Verwaltet von Anvil (roles/base_user). Manuelle Änderungen werden überschrieben.
+{% for key in admin_pubkeys %}
+{% if key | trim | length > 0 %}
+{{ key | trim }}
+{% endif %}
+{% endfor %}

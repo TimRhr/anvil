@@ -1,0 +1,10 @@
+[Unit]
+Description=Anvil — gespoolte Gotify-Nachrichten erneut zustellen
+Documentation=https://example.invalid/anvil
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/anvil-notify-retry
+Nice=10

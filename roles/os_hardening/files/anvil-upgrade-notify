@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Anvil — Gotify-Meldung nach einem unattended-upgrades-Lauf.
+set -uo pipefail
+
+LOG=/var/log/unattended-upgrades/unattended-upgrades.log
+msg="Unattended-Upgrades-Lauf abgeschlossen."
+prio=3
+
+if [[ -f "$LOG" ]]; then
+  recent="$(grep -a 'Packages that were upgraded:' "$LOG" | tail -n1 || true)"
+  [[ -n "$recent" ]] && msg="$msg ${recent#*: }"
+fi
+
+if [[ -f /var/run/reboot-required ]]; then
+  msg="$msg — REBOOT erforderlich. Sicher rebooten: anvil --reboot-if-needed (Kernel-Fallback aktiv)."
+  prio=6
+fi
+
+/usr/local/bin/anvil-notify --priority "$prio" --title "Sicherheitsupdates eingespielt" "$msg"

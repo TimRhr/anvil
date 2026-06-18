@@ -1,0 +1,6 @@
+# {{ ansible_managed }}
+# Anvil — Shell-Härtung (Auto-Logout & restriktive umask)
+TMOUT={{ shell_tmout | default(900) }}
+readonly TMOUT
+export TMOUT
+umask {{ login_umask }}

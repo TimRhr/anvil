@@ -1,0 +1,105 @@
+---
+# =============================================================================
+# roles/ssh_hardening — SSH absichern (Root-/Passwort-Login aus, moderne Krypto)
+#
+# Sicherheitsnetz: Drop-in wird validiert, nur per RELOAD aktiviert, danach
+# Self-Test. Bei ungültiger Konfiguration wird die Änderung zurückgenommen.
+# =============================================================================
+
+- name: "SSH | openssh-server sicherstellen"
+  ansible.builtin.apt:
+    name: openssh-server
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [ssh]
+
+- name: "SSH | Include der Drop-in-Verzeichnisse in sshd_config sicherstellen"
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    line: "Include /etc/ssh/sshd_config.d/*.conf"
+    insertbefore: BOF
+    firstmatch: true
+    validate: "sshd -t -f %s"
+  tags: [ssh]
+
+- name: "SSH | Warn-Banner /etc/issue.net"
+  ansible.builtin.copy:
+    src: issue.net
+    dest: /etc/issue.net
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [ssh]
+
+- name: "SSH | Härtungs-Drop-in deployen (mit Validierung & Rollback)"
+  tags: [ssh]
+  block:
+    - name: "SSH | Drop-in 00-anvil-hardening.conf schreiben"
+      ansible.builtin.template:
+        src: 00-anvil-hardening.conf.j2
+        dest: /etc/ssh/sshd_config.d/00-anvil-hardening.conf
+        owner: root
+        group: root
+        mode: "0600"
+        validate: "sshd -t -f %s"
+      notify: Reload sshd
+
+    - name: "SSH | Gesamtkonfiguration prüfen (sshd -t)"
+      ansible.builtin.command: sshd -t
+      changed_when: false
+  rescue:
+    - name: "SSH | ROLLBACK — fehlerhaftes Drop-in entfernen"
+      ansible.builtin.file:
+        path: /etc/ssh/sshd_config.d/00-anvil-hardening.conf
+        state: absent
+    - name: "SSH | Abbruch wegen ungültiger sshd-Konfiguration"
+      ansible.builtin.fail:
+        msg: "sshd-Konfiguration ungültig — Drop-in wurde entfernt, SSH bleibt unverändert."
+
+- name: "SSH | Reload jetzt ausführen (vor Self-Test)"
+  ansible.builtin.meta: flush_handlers
+  tags: [ssh]
+
+# --- Self-Test ----------------------------------------------------------------
+- name: "SSH | Self-Test: Dienst aktiv?"  # noqa: command-instead-of-module
+  ansible.builtin.command: systemctl is-active ssh
+  register: anvil_ssh_active
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+  tags: [ssh]
+
+- name: "SSH | Self-Test: lauscht sshd auf Port {{ ssh_port }}?"
+  ansible.builtin.wait_for:
+    port: "{{ ssh_port }}"
+    host: 127.0.0.1
+    timeout: 10
+    state: started
+  register: anvil_ssh_listen
+  failed_when: false
+  when: not ansible_check_mode
+  tags: [ssh]
+
+- name: "SSH | Self-Test-Ergebnis melden (Gotify bei Problem)"
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/anvil-notify
+      - "--priority"
+      - "{{ notify_priority_alert }}"
+      - "--title"
+      - "SSH-Self-Test fehlgeschlagen"
+      - "sshd nach Härtung nicht aktiv/erreichbar auf Port {{ ssh_port }} — bitte prüfen!"
+  changed_when: false
+  failed_when: false
+  when:
+    - not ansible_check_mode
+    - (anvil_ssh_active.stdout | default('')) != 'active' or (anvil_ssh_listen.state | default('')) != 'started'
+  tags: [ssh]
+
+- name: "SSH | ✅ Gehärtet"
+  ansible.builtin.debug:
+    msg:
+      - "SSH gehärtet: Root-Login={{ ssh_permit_root_login }}, PasswordAuth={{ ssh_password_authentication }}"
+      - "Port={{ ssh_port }}, Dienst={{ anvil_ssh_active.stdout | default('check-mode') }}"
+  tags: [ssh]

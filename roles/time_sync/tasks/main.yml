@@ -1,0 +1,108 @@
+---
+# =============================================================================
+# roles/time_sync — Zeitsynchronisation mit chrony (inkl. NTS-Option)
+# Korrekte Zeit ist Voraussetzung für Log-Korrelation, Zertifikate und Audit.
+# =============================================================================
+
+- name: "Time | Zeitzone setzen ({{ timezone }})"
+  community.general.timezone:
+    name: "{{ timezone }}"
+  when: timezone | length > 0
+  notify: Restart chrony
+  tags: [time]
+
+- name: "Time | chrony installieren"
+  ansible.builtin.apt:
+    name: chrony
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [time]
+
+- name: "Time | systemd-timesyncd deaktivieren (Konflikt mit chrony)"
+  ansible.builtin.systemd_service:
+    name: systemd-timesyncd
+    state: stopped
+    enabled: false
+    masked: true
+  failed_when: false
+  when: not ansible_check_mode
+  tags: [time]
+
+- name: "Time | Log-Verzeichnis für chrony"
+  ansible.builtin.file:
+    path: /var/log/chrony
+    state: directory
+    owner: _chrony
+    group: _chrony
+    mode: "0750"
+  failed_when: false
+  tags: [time]
+
+- name: "Time | chrony.conf deployen"
+  ansible.builtin.template:
+    src: chrony.conf.j2
+    dest: /etc/chrony/chrony.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart chrony
+  tags: [time]
+
+- name: "Time | chrony aktivieren & starten"
+  ansible.builtin.systemd_service:
+    name: chrony
+    enabled: true
+    state: started
+  when: not ansible_check_mode
+  tags: [time]
+
+- name: "Time | Konfiguration anwenden (Restart jetzt)"
+  ansible.builtin.meta: flush_handlers
+  tags: [time]
+
+# --- Sync-Monitoring ----------------------------------------------------------
+- name: "Time | Auf Zeitsynchronisation warten"
+  ansible.builtin.command: chronyc waitsync 12 0.5 0.0 1
+  register: anvil_chrony_wait
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+  tags: [time]
+
+- name: "Time | Tracking-Status auslesen"
+  ansible.builtin.command: chronyc tracking
+  register: anvil_chrony_tracking
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+  tags: [time]
+
+- name: "Time | Synchronisationsstatus bestimmen"
+  ansible.builtin.set_fact:
+    anvil_time_synced: "{{ 'Leap status     : Normal' in (anvil_chrony_tracking.stdout | default('')) }}"
+  when: not ansible_check_mode
+  tags: [time]
+
+- name: "Time | Gotify-Warnung, wenn nicht synchron"
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/anvil-notify
+      - "--priority"
+      - "{{ notify_priority_warn }}"
+      - "--title"
+      - "Zeitsync nicht bestätigt"
+      - "chrony meldet keine normale Synchronisation. Prüfen: chronyc tracking / sources"
+  changed_when: false
+  failed_when: false
+  when:
+    - not ansible_check_mode
+    - not (anvil_time_synced | default(false))
+  tags: [time]
+
+- name: "Time | ✅ Status"
+  ansible.builtin.debug:
+    msg: >-
+      Zeitsync: {{ 'synchron' if (anvil_time_synced | default(false))
+      else 'NOCH NICHT synchron (siehe chronyc tracking)' }}{{ ' — NTS aktiv' if enable_nts | bool else '' }}
+  tags: [time]

@@ -1,0 +1,29 @@
+# {{ ansible_managed }}
+# Anvil-Zeitsynchronisation (chrony). BSI: korrekte Zeit für Logs/Audit/Zertifikate.
+
+{% if enable_nts | bool %}
+# NTS — authentifizierte Zeit (Network Time Security)
+{% for s in time_sync_nts_servers %}
+server {{ s }} iburst nts
+{% endfor %}
+ntsdumpdir /var/lib/chrony
+{% else %}
+{% for s in time_sync_servers %}
+server {{ s }} iburst
+{% endfor %}
+{% endif %}
+
+# Mindestanzahl an Quellen, bevor die Uhr gestellt wird
+minsources {{ time_sync_min_sources }}
+
+driftfile /var/lib/chrony/chrony.drift
+makestep 1.0 3
+rtcsync
+leapsectz right/UTC
+
+# Anvil-Server agiert NICHT als NTP-Server für andere Hosts
+port 0
+cmdport 0
+
+logdir /var/log/chrony
+log tracking measurements statistics

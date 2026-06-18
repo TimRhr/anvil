@@ -1,0 +1,84 @@
+---
+# =============================================================================
+# roles/audit — Sicherheits-Audit mit Lynis + Compliance-Report
+# =============================================================================
+
+- name: "Audit | Lynis installieren"
+  ansible.builtin.apt:
+    name: lynis
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [audit]
+
+- name: "Audit | Report-Verzeichnis sicherstellen"
+  ansible.builtin.file:
+    path: "{{ anvil_report_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  tags: [audit]
+
+- name: "Audit | Lynis-Scan ausführen"
+  ansible.builtin.command: lynis audit system --quiet --no-colors
+  register: anvil_lynis
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+  tags: [audit]
+
+- name: "Audit | Lynis-Bericht in den Report-Ordner kopieren"
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ anvil_report_dir }}/{{ item.dest }}"
+    remote_src: true
+    mode: "0640"
+  loop:
+    - { src: /var/log/lynis.log, dest: "lynis-{{ ansible_date_time.date }}.log" }
+    - { src: /var/log/lynis-report.dat, dest: "lynis-report-{{ ansible_date_time.date }}.dat" }
+  failed_when: false
+  when: not ansible_check_mode
+  tags: [audit]
+
+- name: "Audit | Hardening-Index auslesen"
+  ansible.builtin.shell:
+    executable: /bin/bash
+    cmd: "set -o pipefail; grep -E '^hardening_index=' /var/log/lynis-report.dat | tail -n1 | cut -d= -f2"
+  register: anvil_hardening_index
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+  tags: [audit]
+
+- name: "Audit | Warnungen/Vorschläge zählen"
+  ansible.builtin.shell:
+    executable: /bin/bash
+    cmd: "set -o pipefail; grep -cE '^(warning|suggestion)\\[\\]=' /var/log/lynis-report.dat 2>/dev/null || echo 0"
+  register: anvil_lynis_findings
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+  tags: [audit]
+
+- name: "Audit | Ergebnis via Gotify melden"
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/anvil-notify
+      - "--priority"
+      - "{{ notify_priority_info }}"
+      - "--title"
+      - "Anvil-Audit abgeschlossen"
+      - >-
+        Lynis Hardening-Index: {{ anvil_hardening_index.stdout | default('n/a') }}
+        | Findings: {{ anvil_lynis_findings.stdout | default('?') }}.
+        Report: {{ anvil_report_dir }}
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+  tags: [audit]
+
+- name: "Audit | ✅ Ergebnis"
+  ansible.builtin.debug:
+    msg: "Lynis Hardening-Index: {{ anvil_hardening_index.stdout | default('n/a') }} (Details: {{ anvil_report_dir }})"
+  tags: [audit]

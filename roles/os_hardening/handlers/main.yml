@@ -1,0 +1,32 @@
+---
+- name: Reload sysctl
+  ansible.builtin.command: sysctl --system
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Restart auditd  # noqa: command-instead-of-module
+  # auditd lässt sich nicht via systemctl/systemd-Modul neustarten -> service-Tool nutzen
+  ansible.builtin.command: service auditd restart
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Load audit rules
+  ansible.builtin.command: augenrules --load
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Restart fail2ban
+  ansible.builtin.service:
+    name: fail2ban
+    state: restarted
+  when: not ansible_check_mode
+
+- name: Update PAM
+  ansible.builtin.command: pam-auth-update --package --force
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Update grub
+  ansible.builtin.command: update-grub
+  changed_when: false
+  when: not ansible_check_mode

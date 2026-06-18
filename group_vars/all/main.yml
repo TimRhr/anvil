@@ -1,0 +1,163 @@
+---
+# =============================================================================
+# group_vars/all/main.yml — Zentrale Defaults & Feature-Toggles für Anvil
+#
+# Diese Werte gelten projektweit. Override-Reihenfolge (höchste zuerst):
+#   1. -e von bootstrap.sh (aus config/anvil.conf)
+#   2. group_vars/all/main.yml  (diese Datei)
+#   3. roles/<rolle>/defaults/main.yml
+# =============================================================================
+
+# --- Globale Pfade ------------------------------------------------------------
+anvil_state_dir: /var/lib/anvil
+anvil_backup_dir: /var/backups/anvil
+anvil_log_dir: /var/log/anvil
+anvil_report_dir: "/var/log/anvil/reports"
+
+# --- Admin-/Standard-User -----------------------------------------------------
+# Werden i.d.R. aus config/anvil.conf via -e gesetzt. Defaults hier als Fallback.
+admin_user: admin
+admin_pubkeys: []          # Liste von Public-Key-Strings (Pflicht: >= 1)
+admin_shell: /bin/bash
+admin_extra_groups: [ssh-users]
+# sudo: Standard MIT Passwort. true = NOPASSWD (nur wenn bewusst gewünscht).
+admin_sudo_nopasswd: false
+# root-Passwort sperren (Login über root-Passwort unmöglich machen).
+admin_lock_root: true
+
+# --- SSH ----------------------------------------------------------------------
+ssh_port: 22
+ssh_permit_root_login: "no"
+ssh_password_authentication: "no"
+ssh_allow_groups: [ssh-users]
+ssh_max_auth_tries: 3
+ssh_login_grace_time: 30
+ssh_client_alive_interval: 300
+ssh_client_alive_count_max: 2
+ssh_allow_tcp_forwarding: "no"
+ssh_x11_forwarding: "no"
+ssh_allow_agent_forwarding: "no"
+ssh_kex_algorithms:
+  - curve25519-sha256
+  - curve25519-sha256@libssh.org
+  - diffie-hellman-group16-sha512
+  - diffie-hellman-group18-sha512
+ssh_ciphers:
+  - chacha20-poly1305@openssh.com
+  - aes256-gcm@openssh.com
+  - aes128-gcm@openssh.com
+  - aes256-ctr
+ssh_macs:
+  - hmac-sha2-512-etm@openssh.com
+  - hmac-sha2-256-etm@openssh.com
+ssh_host_key_algorithms:
+  - ssh-ed25519
+  - rsa-sha2-512
+  - rsa-sha2-256
+# Optionaler Dead-Man-Switch: rollt sshd_config nach N Minuten zurück, wenn
+# der Lauf nicht erfolgreich abschließt. 0 = deaktiviert.
+ssh_deadman_minutes: 0
+
+# --- Firewall (ufw) -----------------------------------------------------------
+firewall_enabled: true
+firewall_default_incoming: deny
+firewall_default_outgoing: allow
+firewall_ssh_rate_limit: true
+# Zusätzlich freizugebende Ports: [{port: 443, proto: tcp, comment: "https"}]
+firewall_extra_rules: []
+
+# --- Zeitsynchronisation (chrony) ---------------------------------------------
+time_sync_enabled: true
+timezone: Europe/Berlin
+time_sync_servers:
+  - 0.de.pool.ntp.org
+  - 1.de.pool.ntp.org
+  - 2.de.pool.ntp.org
+  - 3.de.pool.ntp.org
+time_sync_min_sources: 2
+# NTS = authentifizierte Zeit. enable_nts=true nutzt diese Server statt der obigen.
+enable_nts: false
+time_sync_nts_servers:
+  - time.cloudflare.com
+  - nts.netnod.se
+
+# --- Logging ------------------------------------------------------------------
+logging_journald_persistent: true
+logging_journald_max_use: 1G
+logging_journald_max_retention: 30day
+enable_remote_syslog: false
+remote_syslog_host: ""
+remote_syslog_port: 6514
+remote_syslog_protocol: tls   # tcp | tls
+
+# --- Benachrichtigungen (Gotify) ----------------------------------------------
+notify_enabled: true
+# vault_gotify_url / vault_gotify_token kommen aus group_vars/all/vault.yml.
+notify_gotify_url: "{{ vault_gotify_url | default('') }}"
+notify_gotify_token: "{{ vault_gotify_token | default('') }}"
+notify_app_name: Anvil
+# Standard-Prioritäten (Gotify 0..10).
+notify_priority_info: 3
+notify_priority_warn: 6
+notify_priority_alert: 9
+notify_spool_dir: /var/spool/anvil-notify
+# Info-Push bei jedem erfolgreichen Anvil-Lauf?
+notify_on_run_success: true
+
+# --- OS-Hardening: Master-Toggles ---------------------------------------------
+os_hardening_enabled: true
+enable_apparmor: true
+enable_auditd: true
+enable_auditd_immutable: false       # -e 2: Regeln bis Reboot unveränderbar
+enable_aide: true
+enable_fail2ban: true
+enable_auto_updates: true
+enable_forensics: false              # rkhunter + Process-Accounting
+os_blacklist_usb_storage: false      # USB-Massenspeicher sperren (Vorsicht bei Bare-Metal)
+os_disable_ipv6: false
+
+# PAM / Passwort-Policy
+pam_pwquality_minlen: 14
+pam_pwquality_minclass: 4
+pam_faillock_deny: 5
+pam_faillock_unlock_time: 900
+pam_pwhistory_remember: 5
+login_pass_max_days: 365
+login_pass_min_days: 1
+login_pass_warn_age: 14
+login_umask: "027"
+
+# fail2ban
+fail2ban_bantime: 3600
+fail2ban_findtime: 600
+fail2ban_maxretry: 5
+
+# unattended-upgrades
+auto_updates_automatic_reboot: false   # Kernel-Reboots laufen über kernel_resilience
+auto_updates_mail_disabled: true       # wir nutzen Gotify, kein Mail
+
+# --- Bootloader (GRUB) --------------------------------------------------------
+enable_grub_password: false
+grub_superuser: anvil
+# grub_password_pbkdf2 / vault_grub_password kommen aus dem Vault.
+
+# --- Boot-Resilienz / Kernel-Fallback -----------------------------------------
+kernel_resilience_enabled: true
+enable_watchdog: true
+kernel_panic_reboot_seconds: 10
+kernel_panic_on_oops: 1
+kernel_keep_count: 2
+watchdog_runtime_sec: 30
+watchdog_reboot_sec: 120
+# Boot gilt als erfolgreich, wenn diese Dienste aktiv sind:
+boot_success_required_units:
+  - sshd.service
+boot_success_settle_seconds: 60
+
+# --- Audit --------------------------------------------------------------------
+audit_lynis_enabled: true
+audit_fail_on_warnings: false
+
+# --- Continuous Enforcement (ansible-pull) ------------------------------------
+pull_repo_url: ""              # wird via --enable-timer gesetzt
+pull_schedule: "*-*-* 03:00:00"

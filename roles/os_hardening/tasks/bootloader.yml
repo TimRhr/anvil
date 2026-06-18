@@ -1,0 +1,46 @@
+---
+- name: "Bootloader | GRUB-Passwort vorhanden?"
+  ansible.builtin.assert:
+    that:
+      - vault_grub_password is defined
+      - vault_grub_password | length >= 8
+    fail_msg: "enable_grub_password=true, aber vault_grub_password (>=8 Zeichen) fehlt im Vault."
+    quiet: true
+
+- name: "Bootloader | PBKDF2-Hash aus Klartext-Passwort erzeugen"
+  ansible.builtin.shell:
+    executable: /bin/bash
+    cmd: >-
+      set -o pipefail;
+      printf '%s\n%s\n' "{{ vault_grub_password }}" "{{ vault_grub_password }}"
+      | grub-mkpasswd-pbkdf2 | awk '/grub.pbkdf2.sha512/ {print $NF}'
+  register: anvil_grub_hash
+  changed_when: false
+  no_log: true
+
+- name: "Bootloader | Superuser + Passwort als grub.d-Snippet ablegen"
+  ansible.builtin.copy:
+    dest: /etc/grub.d/01_anvil_password
+    owner: root
+    group: root
+    mode: "0755"
+    content: |
+      #!/bin/sh
+      # {{ ansible_managed }}
+      cat <<'GRUBEOF'
+      set superusers="{{ grub_superuser }}"
+      password_pbkdf2 {{ grub_superuser }} {{ anvil_grub_hash.stdout }}
+      GRUBEOF
+  no_log: true
+  notify: Update grub
+
+- name: "Bootloader | grub-Konfiguration neu erzeugen"
+  ansible.builtin.meta: flush_handlers
+
+- name: "Bootloader | grub.cfg-Leserechte einschränken (0400)"
+  ansible.builtin.file:
+    path: /boot/grub/grub.cfg
+    owner: root
+    group: root
+    mode: "0400"
+  failed_when: false

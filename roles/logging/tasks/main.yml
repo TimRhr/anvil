@@ -1,0 +1,76 @@
+---
+# =============================================================================
+# roles/logging — Persistentes journald, logrotate, optional Remote-Syslog
+# (auditd-Log-Retention wird in os_hardening/auditd gesetzt.)
+# =============================================================================
+
+- name: "Logging | Persistentes Journal-Verzeichnis"
+  ansible.builtin.file:
+    path: /var/log/journal
+    state: directory
+    owner: root
+    group: systemd-journal
+    mode: "2755"
+  when: logging_journald_persistent | bool
+  tags: [logging]
+
+- name: "Logging | journald-Drop-in (persistent + Retention)"
+  ansible.builtin.template:
+    src: journald-anvil.conf.j2
+    dest: /etc/systemd/journald.conf.d/00-anvil.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart journald
+  tags: [logging]
+
+- name: "Logging | logrotate sicherstellen"
+  ansible.builtin.apt:
+    name: logrotate
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [logging]
+
+- name: "Logging | logrotate-Regel für Anvil-/sudo-Logs"
+  ansible.builtin.template:
+    src: logrotate-anvil.j2
+    dest: /etc/logrotate.d/anvil
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [logging]
+
+# --- Optional: Remote-Syslog-Weiterleitung -----------------------------------
+- name: "Logging | rsyslog installieren (für Remote-Forward)"
+  ansible.builtin.apt:
+    name: rsyslog
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: enable_remote_syslog | bool
+  tags: [logging]
+
+- name: "Logging | Remote-Forward-Konfiguration"
+  ansible.builtin.template:
+    src: rsyslog-remote.conf.j2
+    dest: /etc/rsyslog.d/90-anvil-remote.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: enable_remote_syslog | bool
+  notify: Restart rsyslog
+  tags: [logging]
+
+- name: "Logging | Remote-Syslog ohne Zielhost -> Warnung"
+  ansible.builtin.debug:
+    msg: "⚠️ enable_remote_syslog=true, aber remote_syslog_host ist leer — keine Weiterleitung aktiv."
+  when:
+    - enable_remote_syslog | bool
+    - remote_syslog_host | length == 0
+  tags: [logging]
+
+- name: "Logging | ✅ Konfiguriert"
+  ansible.builtin.debug:
+    msg: "journald persistent={{ logging_journald_persistent }}, Remote-Syslog={{ enable_remote_syslog }}"
+  tags: [logging]

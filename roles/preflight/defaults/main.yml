@@ -1,0 +1,22 @@
+---
+# Konfigurationsdateien, die Anvil potenziell verändert und daher VOR jeder
+# Änderung gesichert werden (Wiederherstellung via bootstrap.sh --rollback).
+anvil_backup_files:
+  - /etc/ssh/sshd_config
+  - /etc/ssh/sshd_config.d
+  - /etc/sysctl.conf
+  - /etc/sysctl.d
+  - /etc/default/grub
+  - /etc/default/grub.d
+  - /etc/pam.d/common-password
+  - /etc/pam.d/common-auth
+  - /etc/login.defs
+  - /etc/security/pwquality.conf
+  - /etc/security/limits.conf
+  - /etc/fstab
+  - /etc/chrony/chrony.conf
+  - /etc/systemd/journald.conf
+  - /etc/audit/rules.d
+  - /etc/fail2ban
+  - /etc/modprobe.d
+  - /etc/sudoers.d

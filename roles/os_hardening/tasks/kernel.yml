@@ -1,0 +1,12 @@
+---
+- name: "Kernel | sysctl-Härtung deployen"
+  ansible.builtin.template:
+    src: sysctl-anvil.conf.j2
+    dest: /etc/sysctl.d/99-anvil.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload sysctl
+
+- name: "Kernel | sysctl jetzt anwenden"
+  ansible.builtin.meta: flush_handlers

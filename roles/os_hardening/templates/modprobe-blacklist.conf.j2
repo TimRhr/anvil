@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+# Anvil — selten genutzte/unsichere Kernel-Module deaktivieren (CIS 1.1)
+{% for mod in os_module_blacklist %}
+install {{ mod }} /bin/false
+blacklist {{ mod }}
+{% endfor %}
+{% if os_blacklist_usb_storage | bool %}
+install usb-storage /bin/false
+blacklist usb-storage
+{% endif %}

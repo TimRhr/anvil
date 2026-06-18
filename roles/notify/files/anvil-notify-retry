@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# =============================================================================
+# anvil-notify-retry — stellt gespoolte Gotify-Nachrichten erneut zu
+# Wird vom systemd-Timer anvil-notify-retry.timer periodisch aufgerufen.
+# =============================================================================
+set -euo pipefail
+
+CONF=/etc/anvil/notify.conf
+# shellcheck disable=SC1090
+[[ -r "$CONF" ]] && source "$CONF"
+
+GOTIFY_URL="${GOTIFY_URL:-}"
+GOTIFY_TOKEN="${GOTIFY_TOKEN:-}"
+SPOOL_DIR="${SPOOL_DIR:-/var/spool/anvil-notify}"
+LOG_FILE="${LOG_FILE:-/var/log/anvil/notify.log}"
+
+[[ -d "$SPOOL_DIR" ]] || exit 0
+[[ -n "$GOTIFY_URL" && -n "$GOTIFY_TOKEN" ]] || exit 0
+
+shopt -s nullglob
+for f in "$SPOOL_DIR"/*.json; do
+  if curl -fsS --max-time 10 -H "Content-Type: application/json" \
+       -X POST "${GOTIFY_URL%/}/message?token=${GOTIFY_TOKEN}" \
+       --data @"$f" >/dev/null 2>&1; then
+    rm -f "$f"
+    printf '%s RESENT %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$f" >>"$LOG_FILE" 2>/dev/null || true
+  fi
+done

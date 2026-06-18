@@ -1,0 +1,92 @@
+---
+# =============================================================================
+# roles/notify — Gotify-Benachrichtigung installieren
+# Wird früh ausgeführt, damit alle Folgeschritte (und Fehler) melden können.
+# =============================================================================
+
+- name: "Notify | curl sicherstellen (für Gotify-HTTP-Push)"
+  ansible.builtin.apt:
+    name: curl
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [notify]
+
+- name: "Notify | Konfigurationsverzeichnis /etc/anvil"
+  ansible.builtin.file:
+    path: /etc/anvil
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  tags: [notify]
+
+- name: "Notify | Spool- und Log-Verzeichnis"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  loop:
+    - "{{ notify_spool_dir }}"
+    - "{{ anvil_log_dir }}"
+  tags: [notify]
+
+- name: "Notify | Gotify-Konfiguration ablegen (/etc/anvil/notify.conf)"
+  ansible.builtin.template:
+    src: notify.conf.j2
+    dest: /etc/anvil/notify.conf
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true            # enthält den Gotify-Token
+  tags: [notify]
+
+- name: "Notify | anvil-notify installieren"
+  ansible.builtin.copy:
+    src: anvil-notify
+    dest: /usr/local/bin/anvil-notify
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [notify]
+
+- name: "Notify | anvil-notify-retry installieren"
+  ansible.builtin.copy:
+    src: anvil-notify-retry
+    dest: /usr/local/sbin/anvil-notify-retry
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [notify]
+
+- name: "Notify | systemd-Units für Retry-Timer installieren"
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - anvil-notify-retry.service
+    - anvil-notify-retry.timer
+  notify: Reload systemd
+  tags: [notify]
+
+- name: "Notify | Retry-Timer aktivieren"
+  ansible.builtin.systemd_service:
+    name: anvil-notify-retry.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode
+  tags: [notify]
+
+- name: "Notify | Warnung, wenn Gotify nicht konfiguriert ist"
+  ansible.builtin.debug:
+    msg: >-
+      ⚠️ Gotify-URL/Token sind leer (group_vars/all/vault.yml). Benachrichtigungen
+      werden nur lokal protokolliert/gespoolt, bis Gotify konfiguriert ist.
+  when: notify_gotify_url | length == 0 or notify_gotify_token | length == 0
+  tags: [notify]

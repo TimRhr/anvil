@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+# Anvil — systemd-Hardware-Watchdog (erzwingt Reboot bei echtem Hänger)
+[Manager]
+RuntimeWatchdogSec={{ watchdog_runtime_sec }}
+RebootWatchdogSec={{ watchdog_reboot_sec }}

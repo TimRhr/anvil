@@ -1,0 +1,57 @@
+# =============================================================================
+# anvil.conf — Anvil-Konfiguration (Vorlage)
+#
+# Kopieren nach config/anvil.conf und anpassen:
+#   cp config/anvil.conf.example config/anvil.conf
+#
+# Diese Datei enthält NUR öffentliche Werte (Public-Keys, Toggles) und darf
+# versioniert werden. Echte Geheimnisse (Gotify-Token, GRUB-Passwort) gehören
+# in group_vars/all/vault.yml (ansible-vault-verschlüsselt) — NICHT hierher!
+#
+# Format: einfache Bash-Zuweisungen, wird von bootstrap.sh eingelesen.
+# =============================================================================
+
+# --- Admin-/Standard-User -----------------------------------------------------
+# Name des anzulegenden Standard-Users (erhält sudo + SSH-Key-Login).
+ADMIN_USER="admin"
+
+# SSH-Public-Keys des Admins (ein Eintrag pro Zeile innerhalb der Klammern).
+# NUR öffentliche Schlüssel! Mindestens einer ist Pflicht, sonst bricht Anvil ab.
+ADMIN_PUBKEYS=(
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA...BEISPIEL... admin@workstation"
+)
+
+# --- SSH ----------------------------------------------------------------------
+SSH_PORT=22
+
+# --- Feature-Toggles (übersteuern group_vars/all/main.yml) --------------------
+ENABLE_FAIL2BAN=true
+ENABLE_AIDE=true
+ENABLE_AUTO_UPDATES=true
+ENABLE_APPARMOR=true
+ENABLE_AUDITD=true
+
+# Zeit: NTS = authentifizierte Zeit (Network Time Security). Benötigt NTS-fähige
+# Server in group_vars/all/main.yml (time_sync_nts_servers).
+ENABLE_NTS=false
+
+# Bootloader: GRUB-Passwort schützt den Boot-Editor. ACHTUNG: bei falscher
+# Konfiguration Konsolen-Lockout möglich → bewusst opt-in. Passwort kommt aus
+# dem Vault (vault_grub_password).
+ENABLE_GRUB_PASSWORD=false
+
+# Zentrales Logging an einen Remote-Syslog/SIEM-Server weiterleiten.
+ENABLE_REMOTE_SYSLOG=false
+
+# --- Boot-Resilienz / Kernel-Fallback -----------------------------------------
+# systemd-Watchdog aktivieren, falls /dev/watchdog vorhanden ist (erkennt Hänger).
+ENABLE_WATCHDOG=true
+# Sekunden bis Auto-Reboot nach Kernel-Panik (0 = deaktiviert).
+KERNEL_PANIC_REBOOT_SECONDS=10
+# Mindestanzahl vorzuhaltender Kernel (Known-Good-Fallback), >=2 empfohlen.
+KERNEL_KEEP_COUNT=2
+
+# --- Optional: Hostname/Timezone ----------------------------------------------
+# Leer lassen, um den bestehenden Wert nicht zu verändern.
+ANVIL_HOSTNAME=""
+ANVIL_TIMEZONE="Europe/Berlin"

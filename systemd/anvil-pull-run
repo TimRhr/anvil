@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# =============================================================================
+# anvil-pull-run — Continuous Enforcement: Repo aktualisieren und härten
+# Wird von anvil-pull.service (Timer) aufgerufen. Holt den neuesten Stand und
+# wendet die Härtung idempotent erneut an (Drift-Korrektur).
+# =============================================================================
+set -euo pipefail
+
+ENVFILE=/etc/anvil/pull-env
+# shellcheck disable=SC1090
+[[ -r "$ENVFILE" ]] && source "$ENVFILE"
+
+REPO_DIR="${ANVIL_REPO_DIR:-/opt/anvil}"
+cd "$REPO_DIR"
+
+if [[ -n "${ANVIL_PULL_URL:-}" ]]; then
+  git remote set-url origin "$ANVIL_PULL_URL" 2>/dev/null || true
+fi
+
+git fetch --quiet origin || true
+branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
+git reset --hard "origin/${branch}" --quiet 2>/dev/null || true
+
+exec ./bootstrap.sh apply

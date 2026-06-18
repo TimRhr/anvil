@@ -1,0 +1,27 @@
+---
+- name: "AIDE | Vorhandensein der Datenbank prüfen"
+  ansible.builtin.stat:
+    path: /var/lib/aide/aide.db
+  register: anvil_aide_db
+
+- name: "AIDE | Datenbank initialisieren (einmalig, kann mehrere Minuten dauern)"
+  ansible.builtin.command: aideinit -y -f
+  args:
+    creates: /var/lib/aide/aide.db
+  when:
+    - not anvil_aide_db.stat.exists
+    - not ansible_check_mode
+
+- name: "AIDE | Täglichen Integritätscheck installieren"
+  ansible.builtin.copy:
+    src: anvil-aide-check
+    dest: /etc/cron.daily/anvil-aide
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: "AIDE | Mitgelieferten Standard-Cronjob deaktivieren (Doppelläufe vermeiden)"
+  ansible.builtin.file:
+    path: /etc/cron.daily/aide
+    mode: "0644"
+  failed_when: false

@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# =============================================================================
+# anvil-boot-assess — Boot-Assessment nach dem Start (Kernel-Fallback-Logik)
+#
+# Wird von anvil-boot-success.service spät im Boot ausgeführt:
+#   * Erfolg  (laufender == intended): neuen Kernel als Default festschreiben
+#   * Fallback (laufender != intended): Known-Good behalten + Gotify-ALARM
+#   * kein One-shot offen: laufenden Kernel als Known-Good-Default sichern
+# =============================================================================
+set -uo pipefail
+
+# shellcheck source=/dev/null
+source /usr/local/sbin/anvil-kernel-lib.sh
+
+mkdir -p "$ANVIL_STATE_DIR"
+running="$(uname -r)"
+running_id="$(grub_id_for_kernel "$running")"
+
+if [[ ! -f "$ANVIL_INTENDED_FILE" ]]; then
+  # Normaler Boot ohne offenen One-shot: laufenden Kernel als Default sichern.
+  [[ -n "$running_id" ]] && grub_set_default "$running_id"
+  grub_clear_flags
+  klog "Boot ok ($running) — Known-Good-Default gesichert."
+  exit 0
+fi
+
+intended="$(cat "$ANVIL_INTENDED_FILE" 2>/dev/null || true)"
+
+if [[ "$running" == "$intended" ]]; then
+  # Neuer Kernel hat sauber gebootet -> als neuen Default festschreiben.
+  [[ -n "$running_id" ]] && grub_set_default "$running_id"
+  grub_clear_flags
+  rm -f "$ANVIL_INTENDED_FILE"
+  klog "Neuer Kernel $running erfolgreich aktiv — als Default gesetzt."
+  knotify 3 "Kernel-Update erfolgreich" "Neuer Kernel $running ist aktiv und als Standard gesetzt."
+else
+  # FALLBACK: der vorgesehene Kernel bootete nicht, wir laufen auf Known-Good.
+  [[ -n "$running_id" ]] && grub_set_default "$running_id"
+  grub_clear_flags
+  printf '%s -> %s @ %s\n' "$intended" "$running" "$(date -Is)" >"$ANVIL_FALLBACK_FILE"
+  rm -f "$ANVIL_INTENDED_FILE"
+
+  # Defekten Kernel zurückhalten, damit er nicht erneut automatisch versucht wird.
+  if command -v apt-mark >/dev/null 2>&1; then
+    apt-mark hold "linux-image-$intended" >/dev/null 2>&1 || true
+  fi
+
+  klog "KERNEL-FALLBACK: $intended startete nicht — laufe auf Known-Good $running."
+  knotify 9 "⚠️ Kernel-Fallback aktiv" \
+    "Neuer Kernel $intended bootete NICHT. System läuft auf Known-Good $running. Der defekte Kernel wurde auf 'hold' gesetzt. Bitte prüfen!"
+fi
+exit 0

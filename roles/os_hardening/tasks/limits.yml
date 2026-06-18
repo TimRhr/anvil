@@ -1,0 +1,24 @@
+---
+- name: "Limits | Core-Dumps via limits.conf unterbinden"
+  ansible.builtin.copy:
+    src: anvil-coredump-limits.conf
+    dest: /etc/security/limits.d/99-anvil-coredump.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: "Limits | systemd-coredump.conf.d-Verzeichnis"
+  ansible.builtin.file:
+    path: /etc/systemd/coredump.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: "Limits | systemd-coredump deaktivieren"
+  ansible.builtin.copy:
+    src: coredump-anvil.conf
+    dest: /etc/systemd/coredump.conf.d/anvil.conf
+    owner: root
+    group: root
+    mode: "0644"

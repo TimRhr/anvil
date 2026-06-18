@@ -1,0 +1,8 @@
+---
+- name: "Shell | Auto-Logout (TMOUT) & umask via profile.d"
+  ansible.builtin.template:
+    src: anvil-shell-hardening.sh.j2
+    dest: /etc/profile.d/99-anvil-shell-hardening.sh
+    owner: root
+    group: root
+    mode: "0644"

@@ -1,0 +1,44 @@
+# {{ ansible_managed }}
+# Anvil SSH-Härtung (BSI SYS.1.3.A4 / CIS 5.2). Drop-in, höchste Priorität.
+
+Port {{ ssh_port }}
+AddressFamily {{ 'inet' if os_disable_ipv6 | bool else 'any' }}
+
+# --- Authentifizierung -------------------------------------------------------
+PermitRootLogin {{ ssh_permit_root_login }}
+PasswordAuthentication {{ ssh_password_authentication }}
+KbdInteractiveAuthentication no
+ChallengeResponseAuthentication no
+PubkeyAuthentication yes
+PermitEmptyPasswords no
+AuthenticationMethods publickey
+UsePAM yes
+
+# --- Zugriffskontrolle -------------------------------------------------------
+AllowGroups {{ ssh_allow_groups | join(' ') }}
+MaxAuthTries {{ ssh_max_auth_tries }}
+MaxSessions 10
+LoginGraceTime {{ ssh_login_grace_time }}
+ClientAliveInterval {{ ssh_client_alive_interval }}
+ClientAliveCountMax {{ ssh_client_alive_count_max }}
+
+# --- Funktionen einschränken -------------------------------------------------
+X11Forwarding {{ ssh_x11_forwarding }}
+AllowAgentForwarding {{ ssh_allow_agent_forwarding }}
+AllowTcpForwarding {{ ssh_allow_tcp_forwarding }}
+PermitTunnel no
+PermitUserEnvironment no
+Compression no
+IgnoreRhosts yes
+HostbasedAuthentication no
+
+# --- Logging & Banner --------------------------------------------------------
+LogLevel VERBOSE
+Banner /etc/issue.net
+PrintLastLog yes
+
+# --- Kryptografie (moderne Algorithmen) --------------------------------------
+KexAlgorithms {{ ssh_kex_algorithms | join(',') }}
+Ciphers {{ ssh_ciphers | join(',') }}
+MACs {{ ssh_macs | join(',') }}
+HostKeyAlgorithms {{ ssh_host_key_algorithms | join(',') }}

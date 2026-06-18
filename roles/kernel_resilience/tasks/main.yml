@@ -1,0 +1,104 @@
+---
+# =============================================================================
+# roles/kernel_resilience — Boot-Resilienz & automatischer Kernel-Fallback
+#
+# Mehrschichtig: (1) Panik/Hänger erzwingen Reboot, (2) GRUB bootet headless
+# immer durch, (3) neuer Kernel nur als One-shot mit Known-Good-Fallback,
+# (4) Boot-Assessment wertet aus und alarmiert via Gotify.
+# =============================================================================
+
+# --- (1) Auto-Reboot bei Panik / Hänger --------------------------------------
+- name: "Kernel | sysctl: Auto-Reboot bei Panik"
+  ansible.builtin.template:
+    src: sysctl-panic.conf.j2
+    dest: /etc/sysctl.d/99-anvil-panic.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload sysctl
+
+- name: "Kernel | Watchdog-Gerät vorhanden?"
+  ansible.builtin.stat:
+    path: /dev/watchdog
+  register: anvil_watchdog_dev
+
+- name: "Kernel | systemd-Watchdog konfigurieren (falls /dev/watchdog vorhanden)"
+  ansible.builtin.template:
+    src: watchdog.conf.j2
+    dest: /etc/systemd/system.conf.d/anvil-watchdog.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reexec systemd
+  when:
+    - enable_watchdog | bool
+    - anvil_watchdog_dev.stat.exists
+
+- name: "Kernel | Hinweis, wenn kein Hardware-Watchdog verfügbar"
+  ansible.builtin.debug:
+    msg: >-
+      Kein /dev/watchdog vorhanden — bei reinen Hängern (ohne Panik) bleibt die
+      Provider-/Hypervisor-Konsole der finale Backstop (siehe docs/runbook.md).
+  when:
+    - enable_watchdog | bool
+    - not anvil_watchdog_dev.stat.exists
+
+# --- (2) GRUB headless-robust -------------------------------------------------
+- name: "Kernel | GRUB-Drop-in (saved default + RECORDFAIL-Timeout)"
+  ansible.builtin.template:
+    src: grub-anvil.cfg.j2
+    dest: /etc/default/grub.d/99-anvil.cfg
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Update grub
+
+# --- (3)+(4) Skripte & Boot-Assessment-Service -------------------------------
+- name: "Kernel | Helfer-Bibliothek installieren"
+  ansible.builtin.copy:
+    src: anvil-kernel-lib.sh
+    dest: /usr/local/sbin/anvil-kernel-lib.sh
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: "Kernel | Skripte installieren (prepare-reboot, boot-assess)"
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/usr/local/sbin/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - anvil-prepare-kernel-reboot
+    - anvil-boot-assess
+
+- name: "Kernel | Boot-Assessment-Service installieren"
+  ansible.builtin.template:
+    src: anvil-boot-success.service.j2
+    dest: /etc/systemd/system/anvil-boot-success.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: "Kernel | GRUB & systemd jetzt anwenden"
+  ansible.builtin.meta: flush_handlers
+
+- name: "Kernel | Boot-Assessment-Service aktivieren"
+  ansible.builtin.systemd_service:
+    name: anvil-boot-success.service
+    enabled: true
+  when: not ansible_check_mode
+
+- name: "Kernel | Initialen Known-Good-Default sichern (laufender Kernel)"
+  ansible.builtin.command: /usr/local/sbin/anvil-boot-assess
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: "Kernel | ✅ Boot-Resilienz aktiv"
+  ansible.builtin.debug:
+    msg: >-
+      Kernel-Fallback aktiv: panic={{ kernel_panic_reboot_seconds }}s,
+      Watchdog={{ 'an' if (enable_watchdog | bool and anvil_watchdog_dev.stat.exists) else 'n/a' }}.
+      Sicherer Kernel-Reboot: 'anvil-prepare-kernel-reboot' bzw. 'bootstrap.sh --reboot-if-needed'.

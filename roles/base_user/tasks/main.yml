@@ -1,0 +1,94 @@
+---
+# =============================================================================
+# roles/base_user — Standard-/Admin-User, SSH-Keys und sudo
+#
+# WICHTIG: Läuft VOR ssh_hardening, damit der Zugang gesichert ist, bevor
+# Root- und Passwort-Login deaktiviert werden.
+# =============================================================================
+
+- name: "Base-User | sudo-Effektivmodus bestimmen"
+  ansible.builtin.set_fact:
+    # NOPASSWD, wenn explizit gewünscht ODER kein Passwort-Hash vorliegt
+    # (Key-only-Admin könnte sonst kein sudo nutzen).
+    _admin_effective_nopasswd: "{{ admin_sudo_nopasswd | bool or (admin_password_hash | length == 0) }}"
+  tags: [user]
+
+- name: "Base-User | Warnung bei NOPASSWD ohne gesetztes Admin-Passwort"
+  ansible.builtin.debug:
+    msg: >-
+      ⚠️ sudo läuft für {{ admin_user }} als NOPASSWD (kein admin_password_hash gesetzt).
+      Für passwortgeschütztes sudo vault_admin_password (gehasht) im Vault hinterlegen.
+  when:
+    - _admin_effective_nopasswd | bool
+    - not admin_sudo_nopasswd | bool
+  tags: [user]
+
+- name: "Base-User | Hostname setzen (falls konfiguriert)"
+  ansible.builtin.hostname:
+    name: "{{ anvil_hostname }}"
+  when: anvil_hostname | default('') | length > 0
+  tags: [user]
+
+- name: "Base-User | Gruppe ssh-users anlegen"
+  ansible.builtin.group:
+    name: ssh-users
+    state: present
+  tags: [user]
+
+- name: "Base-User | Admin-User anlegen: {{ admin_user }}"
+  ansible.builtin.user:
+    name: "{{ admin_user }}"
+    shell: "{{ admin_shell }}"
+    groups: "{{ ['sudo'] + admin_extra_groups }}"
+    append: true
+    create_home: true
+    password: "{{ admin_password_hash if admin_password_hash | length > 0 else omit }}"
+    state: present
+  tags: [user]
+
+- name: "Base-User | .ssh-Verzeichnis"
+  ansible.builtin.file:
+    path: "/home/{{ admin_user }}/.ssh"
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: "0700"
+  tags: [user]
+
+- name: "Base-User | authorized_keys verwalten (deklarativ)"
+  ansible.builtin.template:
+    src: authorized_keys.j2
+    dest: "/home/{{ admin_user }}/.ssh/authorized_keys"
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: "0600"
+  tags: [user]
+
+- name: "Base-User | sudo-Rechte (/etc/sudoers.d/{{ admin_user }})"
+  ansible.builtin.template:
+    src: sudoers.j2
+    dest: "/etc/sudoers.d/{{ admin_user }}"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"
+  tags: [user, sudo]
+
+- name: "Base-User | root-Passwort-Login sperren"
+  ansible.builtin.user:
+    name: root
+    password_lock: true
+  when: admin_lock_root | bool
+  tags: [user]
+
+- name: "Base-User | Verifizieren, dass authorized_keys nicht leer ist"
+  ansible.builtin.command: "grep -cE '^(ssh-|ecdsa-|sk-)' /home/{{ admin_user }}/.ssh/authorized_keys"
+  register: anvil_authkeys_count
+  changed_when: false
+  failed_when: anvil_authkeys_count.stdout | int < 1
+  tags: [user]
+
+- name: "Base-User | ✅ Zugang gesichert"
+  ansible.builtin.debug:
+    msg: "Admin-User {{ admin_user }} mit {{ anvil_authkeys_count.stdout }} Key(s) eingerichtet — Hardening kann Root-Login deaktivieren."
+  tags: [user]

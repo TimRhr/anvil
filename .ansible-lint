@@ -1,0 +1,14 @@
+---
+# ansible-lint-Konfiguration für Anvil
+profile: min
+
+exclude_paths:
+  - collections/
+  - tests/molecule/
+  - .github/
+
+skip_list:
+  # Anvil nutzt bewusst geteilte, projektweite Variablen-Präfixe (anvil_, os_,
+  # admin_, ssh_, …), die in group_vars/all zentral definiert und über mehrere
+  # Rollen genutzt werden. Ein rollenspezifisches Präfix wäre hier irreführend.
+  - var-naming[no-role-prefix]

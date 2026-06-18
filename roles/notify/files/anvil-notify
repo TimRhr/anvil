@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# =============================================================================
+# anvil-notify — Push-Benachrichtigung an Gotify (mit lokalem Spool/Retry)
+#
+# Verwendung:
+#   anvil-notify [--priority N] [--title "Titel"] "Nachricht ..."
+#
+# Schlägt der Versand fehl (Gotify offline), wird die Nachricht gespoolt und
+# vom Timer anvil-notify-retry später erneut zugestellt. Der Aufrufer wird
+# NIE mit einem Fehler belastet (Exit 0), damit Hooks robust bleiben.
+# =============================================================================
+set -euo pipefail
+
+CONF=/etc/anvil/notify.conf
+# shellcheck disable=SC1090
+[[ -r "$CONF" ]] && source "$CONF"
+
+GOTIFY_URL="${GOTIFY_URL:-}"
+GOTIFY_TOKEN="${GOTIFY_TOKEN:-}"
+PRIORITY_DEFAULT="${PRIORITY_DEFAULT:-5}"
+APP_NAME="${APP_NAME:-Anvil}"
+SPOOL_DIR="${SPOOL_DIR:-/var/spool/anvil-notify}"
+LOG_FILE="${LOG_FILE:-/var/log/anvil/notify.log}"
+
+priority="$PRIORITY_DEFAULT"
+title="$APP_NAME"
+declare -a rest=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --priority) priority="${2:?}"; shift 2 ;;
+    --title)    title="${2:?}"; shift 2 ;;
+    --)         shift; rest+=("$@"); break ;;
+    *)          rest+=("$1"); shift ;;
+  esac
+done
+message="${rest[*]:-}"
+[[ -n "$message" ]] || message="(leere Nachricht)"
+# Hostnamen voranstellen für Kontext bei mehreren Servern.
+message="[$(hostname -s 2>/dev/null || echo host)] $message"
+
+json_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"; s="${s//\"/\\\"}"
+  s="${s//$'\n'/\\n}"; s="${s//$'\t'/\\t}"; s="${s//$'\r'/}"
+  printf '%s' "$s"
+}
+
+body="$(printf '{"title":"%s","message":"%s","priority":%s}' \
+  "$(json_escape "$title")" "$(json_escape "$message")" "$priority")"
+
+log_line() { printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >>"$LOG_FILE" 2>/dev/null || true; }
+
+mkdir -p "$SPOOL_DIR" 2>/dev/null || true
+
+send() {
+  [[ -n "$GOTIFY_URL" && -n "$GOTIFY_TOKEN" ]] || return 1
+  curl -fsS --max-time 10 -H "Content-Type: application/json" \
+    -X POST "${GOTIFY_URL%/}/message?token=${GOTIFY_TOKEN}" \
+    --data "$1" >/dev/null 2>&1
+}
+
+if send "$body"; then
+  log_line "SENT prio=$priority title=\"$title\""
+else
+  spool="$SPOOL_DIR/$(date '+%Y%m%d-%H%M%S')-$$-$RANDOM.json"
+  printf '%s' "$body" >"$spool"
+  log_line "SPOOLED prio=$priority title=\"$title\" -> $spool"
+fi
+exit 0

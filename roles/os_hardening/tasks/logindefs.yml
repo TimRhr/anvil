@@ -1,0 +1,17 @@
+---
+- name: "Login.defs | Passwort-/umask-Richtlinien setzen"
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: "^#?\\s*{{ item.key }}\\b"
+    line: "{{ item.key }}\t{{ item.value }}"
+  loop:
+    - { key: "PASS_MAX_DAYS", value: "{{ login_pass_max_days }}" }
+    - { key: "PASS_MIN_DAYS", value: "{{ login_pass_min_days }}" }
+    - { key: "PASS_WARN_AGE", value: "{{ login_pass_warn_age }}" }
+    - { key: "UMASK", value: "{{ login_umask }}" }
+    - { key: "ENCRYPT_METHOD", value: "SHA512" }
+    - { key: "SHA_CRYPT_MIN_ROUNDS", value: "100000" }
+    - { key: "LOGIN_RETRIES", value: "5" }
+    - { key: "LOGIN_TIMEOUT", value: "60" }
+  loop_control:
+    label: "{{ item.key }}"

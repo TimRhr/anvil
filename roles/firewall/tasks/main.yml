@@ -1,0 +1,66 @@
+---
+# =============================================================================
+# roles/firewall — Host-Firewall mit ufw
+#
+# Reihenfolge ist wichtig: SSH wird FREIGEGEBEN, bevor "default deny incoming"
+# greift, damit die laufende Sitzung nicht abreißt.
+# =============================================================================
+
+- name: "Firewall | ufw installieren"
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [firewall]
+
+- name: "Firewall | Loopback erlauben"
+  community.general.ufw:
+    rule: allow
+    interface: lo
+    direction: in
+  tags: [firewall]
+
+- name: "Firewall | SSH zuerst freigeben (rate-limited)"
+  community.general.ufw:
+    rule: "{{ 'limit' if firewall_ssh_rate_limit | bool else 'allow' }}"
+    port: "{{ ssh_port | string }}"
+    proto: tcp
+    comment: "anvil: ssh"
+  tags: [firewall]
+
+- name: "Firewall | Zusätzliche Freigaben"
+  community.general.ufw:
+    rule: "{{ item.rule | default('allow') }}"
+    port: "{{ item.port | string }}"
+    proto: "{{ item.proto | default('tcp') }}"
+    comment: "anvil: {{ item.comment | default('extra') }}"
+  loop: "{{ firewall_extra_rules }}"
+  when: firewall_extra_rules | length > 0
+  tags: [firewall]
+
+- name: "Firewall | Default-Policy setzen (incoming/outgoing)"
+  community.general.ufw:
+    direction: "{{ item.direction }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - { direction: incoming, policy: "{{ firewall_default_incoming }}" }
+    - { direction: outgoing, policy: "{{ firewall_default_outgoing }}" }
+    - { direction: routed, policy: deny }
+  tags: [firewall]
+
+- name: "Firewall | Logging aktivieren (low)"
+  community.general.ufw:
+    logging: "low"
+  tags: [firewall]
+
+- name: "Firewall | ufw aktivieren"
+  community.general.ufw:
+    state: enabled
+  when: not ansible_check_mode
+  tags: [firewall]
+
+- name: "Firewall | ✅ Aktiv"
+  ansible.builtin.debug:
+    msg: "ufw aktiv — incoming={{ firewall_default_incoming }}, SSH {{ 'LIMIT' if firewall_ssh_rate_limit else 'ALLOW' }} auf Port {{ ssh_port }}"
+  tags: [firewall]

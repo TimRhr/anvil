@@ -1,0 +1,37 @@
+---
+# /dev/shm ist immer vorhanden -> sicher härtbar.
+- name: "FS | /dev/shm mit nodev,nosuid,noexec mounten"
+  ansible.posix.mount:
+    path: /dev/shm
+    src: tmpfs
+    fstype: tmpfs
+    opts: defaults,nodev,nosuid,noexec
+    state: mounted
+  when: not ansible_check_mode
+
+# /tmp und /var/tmp nur härten, wenn sie EIGENE Mountpoints sind
+# (sonst würde ein Remount von / nötig — zu riskant, daher übersprungen).
+- name: "FS | Vorhandene eigene Mounts für /tmp und /var/tmp ermitteln"
+  ansible.builtin.set_fact:
+    anvil_tmp_mounts: "{{ ansible_mounts | selectattr('mount', 'in', ['/tmp', '/var/tmp']) | list }}"
+
+- name: "FS | /tmp und /var/tmp mit nodev,nosuid,noexec härten"
+  ansible.posix.mount:
+    path: "{{ item.mount }}"
+    src: "{{ item.device }}"
+    fstype: "{{ item.fstype }}"
+    opts: "{{ ((item.options.split(',') | reject('in', ['nodev', 'nosuid', 'noexec']) | list) + ['nodev', 'nosuid', 'noexec']) | unique | join(',') }}"
+    state: mounted
+  loop: "{{ anvil_tmp_mounts }}"
+  loop_control:
+    label: "{{ item.mount }}"
+  when:
+    - not ansible_check_mode
+    - anvil_tmp_mounts | length > 0
+
+- name: "FS | Hinweis, wenn /tmp kein eigener Mount ist"
+  ansible.builtin.debug:
+    msg: >-
+      /tmp ist kein eigener Mountpoint — nodev/nosuid/noexec wurde übersprungen.
+      Empfehlung: eigene Partition oder tmp.mount (siehe docs/runbook.md).
+  when: "'/tmp' not in (ansible_mounts | map(attribute='mount') | list)"

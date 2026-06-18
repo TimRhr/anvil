@@ -1,0 +1,47 @@
+---
+- name: "Perms | Kritische Account-Dateien absichern"
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: /etc/passwd, owner: root, group: root, mode: "0644" }
+    - { path: /etc/group, owner: root, group: root, mode: "0644" }
+    - { path: /etc/shadow, owner: root, group: shadow, mode: "0640" }
+    - { path: /etc/gshadow, owner: root, group: shadow, mode: "0640" }
+    - { path: /etc/passwd-, owner: root, group: root, mode: "0600" }
+    - { path: /etc/group-, owner: root, group: root, mode: "0600" }
+    - { path: /etc/shadow-, owner: root, group: shadow, mode: "0640" }
+    - { path: /etc/gshadow-, owner: root, group: shadow, mode: "0640" }
+  loop_control:
+    label: "{{ item.path }}"
+  failed_when: false
+
+- name: "Perms | Cron-Verzeichnisse und -Dateien absichern"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: root
+    group: root
+    mode: "0700"
+  loop:
+    - /etc/cron.d
+    - /etc/cron.daily
+    - /etc/cron.hourly
+    - /etc/cron.weekly
+    - /etc/cron.monthly
+  failed_when: false
+
+- name: "Perms | /etc/crontab absichern"
+  ansible.builtin.file:
+    path: /etc/crontab
+    owner: root
+    group: root
+    mode: "0600"
+  failed_when: false
+
+- name: "Perms | Private SSH-Host-Keys (0600)"
+  ansible.builtin.shell:
+    executable: /bin/bash
+    cmd: "chmod 0600 /etc/ssh/ssh_host_*_key 2>/dev/null; chmod 0644 /etc/ssh/ssh_host_*_key.pub 2>/dev/null; true"
+  changed_when: false

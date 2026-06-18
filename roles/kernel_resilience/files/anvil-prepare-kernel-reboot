@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# =============================================================================
+# anvil-prepare-kernel-reboot — sicherer Reboot in einen neuen Kernel
+#
+# Bootet den NEUESTEN installierten Kernel GENAU EINMAL (one-shot). Der
+# persistente Default bleibt der aktuell laufende (Known-Good) Kernel. Startet
+# der neue Kernel nicht, fällt der nächste (erzwungene) Reboot automatisch auf
+# den Known-Good zurück. anvil-boot-assess wertet das Ergebnis aus.
+#
+# Aufruf: sudo anvil-prepare-kernel-reboot [--no-reboot]
+# =============================================================================
+set -euo pipefail
+
+# shellcheck source=/dev/null
+source /usr/local/sbin/anvil-kernel-lib.sh
+
+do_reboot=true
+[[ "${1:-}" == "--no-reboot" ]] && do_reboot=false
+
+mkdir -p "$ANVIL_STATE_DIR"
+
+running="$(uname -r)"
+newest="$(newest_kernel)"
+
+if [[ -z "$newest" || "$newest" == "$running" ]]; then
+  klog "Kein neuerer Kernel als $running installiert — normaler Reboot."
+  rm -f "$ANVIL_INTENDED_FILE"
+  "$do_reboot" && systemctl reboot
+  exit 0
+fi
+
+running_id="$(grub_id_for_kernel "$running")"
+newest_id="$(grub_id_for_kernel "$newest")"
+
+if [[ -z "$newest_id" ]]; then
+  klog "WARN: GRUB-Eintrag für $newest nicht gefunden — breche sicheren Reboot ab."
+  knotify 6 "Kernel-Reboot abgebrochen" "GRUB-Eintrag für neuen Kernel $newest nicht gefunden."
+  exit 1
+fi
+
+# Known-Good als Default, neuen Kernel nur einmal booten
+[[ -n "$running_id" ]] && grub_set_default "$running_id"
+grub_reboot_once "$newest_id"
+printf '%s\n' "$newest" >"$ANVIL_INTENDED_FILE"
+
+klog "One-shot: boote $newest einmalig (Fallback bleibt $running)."
+knotify 5 "Kernel-Reboot" "Boote neuen Kernel $newest (Fallback: $running). Ergebnis folgt nach dem Neustart."
+
+if "$do_reboot"; then
+  sync
+  systemctl reboot
+fi
