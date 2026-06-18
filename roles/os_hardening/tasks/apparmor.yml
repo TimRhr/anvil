@@ -39,11 +39,14 @@
     - not ansible_check_mode
   tags: [apparmor]
 
-- name: "AppArmor | Enforce: complain-Profile bestimmen"
+- name: "AppArmor | Enforce: complain-Profile bestimmen (nur Top-Level)"
   ansible.builtin.set_fact:
+    # Child-/Hat-Profile (Name mit '//') ausschließen: aa-enforce greift bei
+    # ihnen nicht und sie bleiben in complain -> würde sonst jeden Lauf 'changed'.
     anvil_aa_complain: >-
       {{ (anvil_aa_json.stdout | from_json).profiles | dict2items
-         | selectattr('value', 'equalto', 'complain') | map(attribute='key') | list }}
+         | selectattr('value', 'equalto', 'complain') | map(attribute='key')
+         | reject('search', '//') | list }}
   when:
     - apparmor_enforce_all | bool
     - not ansible_check_mode
@@ -53,7 +56,10 @@
 - name: "AppArmor | Enforce: complain-Profile in enforce-Modus setzen"
   ansible.builtin.command: "aa-enforce {{ item }}"
   loop: "{{ anvil_aa_complain | default([]) }}"
-  changed_when: true
+  # Konvergenz-Aktion: aa-enforce liefert keinen verlässlichen Change-Status,
+  # daher kein 'changed' melden (sonst nie idempotent, falls ein Profil
+  # hartnäckig in complain bleibt). Wirkung steht im Folge-Debug.
+  changed_when: false
   failed_when: false
   when:
     - apparmor_enforce_all | bool
