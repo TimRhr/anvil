@@ -1,0 +1,13 @@
+---
+# dev-Preset: Baseline mit ALLEN Maßnahmen (inkl. Forensik), Gotify still.
+admin_user: devadmin
+admin_pubkeys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDdEvDevDevDevDevDevDevDevDevDevDevDevDevDev00 dev@anvil"
+anvil_posture: baseline
+notify_enabled: false
+vault_gotify_url: ""
+vault_gotify_token: ""
+enable_aide: true
+enable_forensics: true
+enable_auto_updates: true
+audit_lynis_enabled: true

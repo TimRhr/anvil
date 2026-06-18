@@ -1,0 +1,10 @@
+---
+# dev-Preset: Standard-Härtung (baseline), alles default.
+admin_user: devadmin
+admin_pubkeys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDdEvDevDevDevDevDevDevDevDevDevDevDevDevDev00 dev@anvil"
+anvil_posture: baseline
+# Dev: Gotify ruhigstellen (keine echten Pushes beim Testen).
+notify_enabled: false
+vault_gotify_url: ""
+vault_gotify_token: ""

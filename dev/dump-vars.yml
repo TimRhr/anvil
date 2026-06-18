@@ -1,0 +1,36 @@
+---
+# =============================================================================
+# dev/dump-vars.yml — zeigt die AUFGELÖSTEN Posture-/Toggle-Variablen für ein
+# Preset, ohne irgendetwas zu verändern (kein become, keine Facts, keine
+# Collections nötig). Schnell-Check, ob die Posture-Logik korrekt greift.
+#
+#   ansible-playbook -i inventory.ini dev/dump-vars.yml -e @dev/presets/<p>.yml
+# =============================================================================
+- name: "Anvil dev — aufgelöste Variablen"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  tasks:
+    - name: "Effektive Einstellungen"
+      ansible.builtin.debug:
+        msg:
+          - "posture .................. {{ anvil_posture }} (crown={{ anvil_crown_jewels | bool }})"
+          - "admin_user ............... {{ admin_user }}"
+          - "ssh_mfa_method ........... {{ ssh_mfa_method }} (totp_enrolled={{ ssh_totp_enrolled | default(false) }})"
+          - "ssh_allowed_cidrs ........ {{ ssh_allowed_cidrs | default([]) }}"
+          - "enable_apparmor .......... {{ enable_apparmor }}"
+          - "apparmor_enforce_all ..... {{ apparmor_enforce_all }}"
+          - "enable_auditd ............ {{ enable_auditd }} (immutable={{ enable_auditd_immutable }})"
+          - "os_blacklist_usb_storage . {{ os_blacklist_usb_storage }}"
+          - "kernel_lockdown .......... '{{ kernel_lockdown }}'"
+          - "kernel_disable_modules ... {{ kernel_disable_module_loading }}"
+          - "enable_aide .............. {{ enable_aide }}"
+          - "enable_fail2ban .......... {{ enable_fail2ban }}"
+          - "enable_auto_updates ...... {{ enable_auto_updates }}"
+          - "enable_forensics ......... {{ enable_forensics }}"
+          - "enable_remote_syslog ..... {{ enable_remote_syslog }} (host='{{ remote_syslog_host }}')"
+          - "firewall_egress_enforce .. {{ firewall_egress_enforce }} -> outgoing={{ 'deny' if firewall_egress_enforce | bool else firewall_default_outgoing }}"
+          - "enable_grub_password ..... {{ enable_grub_password }}"
+          - "notify_enabled ........... {{ notify_enabled }}"
+          - "audit_lynis_enabled ...... {{ audit_lynis_enabled }}"

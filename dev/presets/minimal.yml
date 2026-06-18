@@ -1,0 +1,14 @@
+---
+# dev-Preset: schnellstmöglich (für zügige VM-Iteration). Langsame/aufwändige
+# Maßnahmen (AIDE-Init, Lynis, Forensik, Auto-Updates) sind aus.
+admin_user: devadmin
+admin_pubkeys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDdEvDevDevDevDevDevDevDevDevDevDevDevDevDev00 dev@anvil"
+anvil_posture: baseline
+notify_enabled: false
+vault_gotify_url: ""
+vault_gotify_token: ""
+enable_aide: false
+enable_forensics: false
+enable_auto_updates: false
+audit_lynis_enabled: false

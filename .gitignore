@@ -22,6 +22,10 @@ reports/
 # Ansible-Collections, falls lokal installiert
 collections/
 
+# Dev-Harness-Laufzeit (von dev/dev.sh erzeugt) — nie committen
+dev/.venv/
+dev/.ansible-home/
+
 # GitHub-Workflows: vorerst ignoriert, weil der aktuelle PAT keinen
 # 'workflow'-Scope hat (Push würde sonst abgelehnt). Zum Aktivieren diese Zeile
 # entfernen und Token um 'workflow'-Scope erweitern bzw. SSH-Remote nutzen,

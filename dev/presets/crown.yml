@@ -1,0 +1,12 @@
+---
+# dev-Preset: Kronjuwelen-Höchsthärtung (crown_jewels), MFA=auto (→ FIDO2).
+# Ohne sk-Key in admin_pubkeys wird FIDO2 NICHT erzwungen (Lockout-Schutz) —
+# ideal zum Testen der crown-Posture in der VM ohne Aussperr-Risiko.
+admin_user: devadmin
+admin_pubkeys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDdEvDevDevDevDevDevDevDevDevDevDevDevDevDev00 dev@anvil"
+anvil_posture: crown_jewels
+ssh_mfa_method: auto
+notify_enabled: false
+vault_gotify_url: ""
+vault_gotify_token: ""

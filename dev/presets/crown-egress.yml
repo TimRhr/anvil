@@ -1,0 +1,12 @@
+---
+# dev-Preset: crown_jewels mit AKTIVIERTER Egress-Firewall (deny outgoing +
+# Allowlist). Nur in der VM testen — kann ausgehenden Verkehr blockieren.
+admin_user: devadmin
+admin_pubkeys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDdEvDevDevDevDevDevDevDevDevDevDevDevDevDev00 dev@anvil"
+anvil_posture: crown_jewels
+ssh_mfa_method: auto
+firewall_egress_enforce: true
+notify_enabled: false
+vault_gotify_url: ""
+vault_gotify_token: ""

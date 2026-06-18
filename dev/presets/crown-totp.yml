@@ -1,0 +1,13 @@
+---
+# dev-Preset: crown_jewels mit TOTP (pam_oath). ssh_totp_enrolled bleibt false
+# -> TOTP wird VORBEREITET, aber NICHT erzwungen (kein Lockout in der VM).
+# Zum echten Enforce-Test in der VM /etc/users.oath füllen und hier auf true.
+admin_user: devadmin
+admin_pubkeys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDdEvDevDevDevDevDevDevDevDevDevDevDevDevDev00 dev@anvil"
+anvil_posture: crown_jewels
+ssh_mfa_method: totp
+ssh_totp_enrolled: false
+notify_enabled: false
+vault_gotify_url: ""
+vault_gotify_token: ""
