@@ -1,0 +1,80 @@
+---
+# =============================================================================
+# roles/profiles — App-Overlay-Motor (Phase 3)
+#
+# Wendet je gewähltem Profil (anvil_profiles) das einheitliche Härtungsmuster
+# additiv an, baut abgewählte Profile zurück und meldet Drift. Läuft immer;
+# Overlays nur bei Auswahl, Drift-Erkennung immer.
+# =============================================================================
+
+- name: "Profiles | State-Verzeichnis sicherstellen"
+  ansible.builtin.file:
+    path: "{{ anvil_state_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  tags: [profiles]
+
+- name: "Profiles | Erwartete Ports initialisieren (SSH + Extra-Regeln)"
+  ansible.builtin.set_fact:
+    anvil_expected_ports: "{{ ([ssh_port] + (firewall_extra_rules | map(attribute='port') | list)) | map('string') | list }}"
+  tags: [profiles, drift]
+
+- name: "Profiles | Bisher angewendete Profile lesen"
+  ansible.builtin.slurp:
+    src: "{{ profiles_state_file }}"
+  register: anvil_profiles_prev_raw
+  failed_when: false
+  changed_when: false
+  tags: [profiles]
+
+- name: "Profiles | Vorherige Profilliste ermitteln"
+  ansible.builtin.set_fact:
+    anvil_profiles_prev: >-
+      {{ (anvil_profiles_prev_raw.content | b64decode).split('\n') | map('trim') | select() | list
+         if anvil_profiles_prev_raw.content is defined else [] }}
+  tags: [profiles]
+
+- name: "Profiles | Vorhandene Profil-Definitionen prüfen"
+  ansible.builtin.stat:
+    path: "{{ playbook_dir }}/profiles/{{ item }}.yml"
+  loop: "{{ anvil_profiles | default([]) }}"
+  register: anvil_profiles_check
+  tags: [profiles]
+
+- name: "Profiles | Gültige (vorhandene) Profile bestimmen"
+  ansible.builtin.set_fact:
+    anvil_profiles_valid: "{{ anvil_profiles_check.results | default([]) | selectattr('stat.exists') | map(attribute='item') | list }}"
+  tags: [profiles]
+
+- name: "Profiles | Aktive Profile anwenden"
+  ansible.builtin.include_tasks: apply_profile.yml
+  loop: "{{ anvil_profiles_valid | default([]) }}"
+  loop_control:
+    loop_var: profile_name
+    label: "{{ profile_name }}"
+  tags: [profiles]
+
+- name: "Profiles | Abgewählte Profile zurückbauen"
+  ansible.builtin.include_tasks: remove_profile.yml
+  loop: "{{ anvil_profiles_prev | difference(anvil_profiles_valid | default([])) }}"
+  loop_control:
+    loop_var: profile_name
+    label: "{{ profile_name }}"
+  tags: [profiles]
+
+- name: "Profiles | Angewendete Profile speichern"
+  ansible.builtin.copy:
+    content: "{{ (anvil_profiles_valid | default([])) | join('\n') }}\n"
+    dest: "{{ profiles_state_file }}"
+    owner: root
+    group: root
+    mode: "0640"
+  changed_when: false
+  tags: [profiles]
+
+- name: "Profiles | Drift-Erkennung"
+  ansible.builtin.include_tasks: drift.yml
+  when: profiles_drift_detect | bool
+  tags: [profiles, drift]

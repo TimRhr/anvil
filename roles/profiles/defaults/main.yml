@@ -1,0 +1,4 @@
+---
+# Fallback-Defaults für das Profil-Schema (werden je Profil aus profiles/<name>.yml
+# über include_vars(name=_p) geladen und mit | default(...) referenziert).
+profiles_state_file: "{{ anvil_state_dir }}/applied-profiles"

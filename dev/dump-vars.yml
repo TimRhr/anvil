@@ -34,3 +34,5 @@
           - "enable_grub_password ..... {{ enable_grub_password }}"
           - "notify_enabled ........... {{ notify_enabled }}"
           - "audit_lynis_enabled ...... {{ audit_lynis_enabled }}"
+          - "anvil_profiles .......... {{ anvil_profiles | default([]) }}"
+          - "docker_restrict_published {{ docker_restrict_published }}"

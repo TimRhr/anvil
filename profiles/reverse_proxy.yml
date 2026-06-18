@@ -1,0 +1,58 @@
+---
+# =============================================================================
+# profiles/reverse_proxy.yml — Overlay für einen Reverse-Proxy (Default: Caddy)
+#
+# Härtet einen auf dem HOST laufenden Reverse-Proxy. Läuft der Proxy als
+# Container, greifen nur die Firewall-Teile (Ingress) — die Dienst-Härtung
+# kommt dann über das container_host-Profil bzw. die Container-Ebene.
+#
+# Für Traefik: profile_service auf "traefik.service" setzen und ggf.
+# reverse_proxy_rw_paths anpassen.
+# =============================================================================
+
+profile_service: caddy.service
+
+# Ingress: HTTP/HTTPS (inkl. HTTP/3 über QUIC/UDP 443)
+profile_ingress:
+  - { port: 80, proto: tcp, comment: "http" }
+  - { port: 443, proto: tcp, comment: "https" }
+  - { port: 443, proto: udp, comment: "http3-quic" }
+
+# Egress: i.d.R. zu lokalen Upstreams/Containern — nur relevant, wenn
+# firewall_egress_enforce=true. Bei Bedarf hier ergänzen.
+profile_egress: []
+
+# AppArmor-Profile, die enforced werden sollen (falls vorhanden). Caddy bringt
+# standardmäßig keines mit -> leer.
+profile_apparmor: []
+
+# systemd-Sandbox für den Proxy-Dienst (Caddy benötigt CAP_NET_BIND_SERVICE für
+# Port 80/443 und Schreibzugriff auf seinen Daten-/Zertifikatspfad).
+# Für Traefik ggf. ReadWritePaths anpassen.
+profile_sandbox:
+  NoNewPrivileges: "true"
+  ProtectSystem: strict
+  ProtectHome: "true"
+  PrivateTmp: "true"
+  ProtectKernelTunables: "true"
+  ProtectKernelModules: "true"
+  ProtectControlGroups: "true"
+  RestrictAddressFamilies: "AF_INET AF_INET6 AF_UNIX"
+  RestrictNamespaces: "true"
+  LockPersonality: "true"
+  MemoryDenyWriteExecute: "true"
+  SystemCallArchitectures: native
+  CapabilityBoundingSet: "CAP_NET_BIND_SERVICE"
+  AmbientCapabilities: "CAP_NET_BIND_SERVICE"
+  ReadWritePaths: "/var/lib/caddy /var/log/caddy"
+
+# Datei-/Verzeichnisrechte (nur angewendet, wenn vorhanden)
+profile_paths:
+  - { path: /etc/caddy, owner: root, group: root, mode: "0750" }
+
+# auditd-Watches auf die Proxy-Konfiguration
+profile_audit:
+  - { path: /etc/caddy, perms: wa, key: revproxy-config }
+
+# Bei Sandbox-Änderung neu starten (kurzer Blip akzeptabel beim Proxy)
+profile_restart: true

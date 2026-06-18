@@ -1,0 +1,4 @@
+## Anvil-managed — auditd-Watches für Profil {{ profile_name }}
+{% for w in (_p.profile_audit | default([])) %}
+-w {{ w.path }} -p {{ w.perms | default('wa') }} -k {{ w.key | default(profile_name) }}
+{% endfor %}

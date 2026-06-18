@@ -1,0 +1,17 @@
+---
+- name: Profiles reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: not ansible_check_mode
+
+- name: Profiles load audit rules  # noqa: command-instead-of-module
+  # augenrules --load gibt bei "No change" rc=1 zurück (kein echter Fehler);
+  # im crown-Modus sperrt -e 2 (immutable) weiteres Laden bis zum Reboot.
+  ansible.builtin.command: augenrules --load
+  register: anvil_profiles_augenrules
+  changed_when: "'No change' not in (anvil_profiles_augenrules.stdout | default('No change'))"
+  failed_when:
+    - anvil_profiles_augenrules.rc != 0
+    - "'No change' not in (anvil_profiles_augenrules.stdout | default(''))"
+    - "'unable to set' not in (anvil_profiles_augenrules.stderr | default('') | lower)"
+  when: not ansible_check_mode

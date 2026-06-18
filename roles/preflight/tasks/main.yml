@@ -92,6 +92,27 @@
   when: anvil_crown_jewels | bool
   tags: [always]
 
+- name: "Preflight | App-Profile: Definitionen vorhanden?"
+  ansible.builtin.stat:
+    path: "{{ playbook_dir }}/profiles/{{ item }}.yml"
+  loop: "{{ anvil_profiles | default([]) }}"
+  register: anvil_profile_stats
+  when: anvil_profiles | default([]) | length > 0
+  tags: [always]
+
+- name: "Preflight | Warnung bei unbekanntem Profil"
+  ansible.builtin.debug:
+    msg: >-
+      ⚠️ Unbekanntes Profil '{{ item.item }}' — keine profiles/{{ item.item }}.yml gefunden.
+      Es wird beim Lauf übersprungen. Verfügbare Profile siehe profiles/.
+  loop: "{{ anvil_profile_stats.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when:
+    - anvil_profiles | default([]) | length > 0
+    - not (item.stat.exists | default(false))
+  tags: [always]
+
 # --- Arbeitsverzeichnisse anlegen --------------------------------------------
 - name: "Preflight | Anvil-Verzeichnisse anlegen"
   ansible.builtin.file:

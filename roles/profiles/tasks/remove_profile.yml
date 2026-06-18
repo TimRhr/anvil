@@ -1,0 +1,41 @@
+---
+# Baut ein ABGEWÄHLTES Profil zurück (profile_name war zuvor aktiv, jetzt nicht
+# mehr in anvil_profiles). Audit-Regeln gehen immer (Name bekannt); Sandbox/
+# Ingress nur, wenn die Profil-Definition noch vorhanden ist.
+
+- name: "Rückbau | Profil-Definition laden (falls vorhanden)"
+  ansible.builtin.include_vars:
+    file: "{{ playbook_dir }}/profiles/{{ profile_name }}.yml"
+    name: _p
+  failed_when: false
+
+- name: "Rückbau | auditd-Regeln entfernen"
+  ansible.builtin.file:
+    path: "/etc/audit/rules.d/anvil-profile-{{ profile_name }}.rules"
+    state: absent
+  notify: Profiles load audit rules
+
+- name: "Rückbau | Sandbox-Drop-in entfernen"
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ _p.profile_service }}.d/anvil-sandbox.conf"
+    state: absent
+  notify: Profiles reload systemd
+  when:
+    - _p is defined
+    - (_p.profile_service | default('')) | length > 0
+
+- name: "Rückbau | Ingress-Freigaben entfernen"
+  community.general.ufw:
+    rule: "{{ item.rule | default('allow') }}"
+    port: "{{ item.port | string }}"
+    proto: "{{ item.proto | default('tcp') }}"
+    delete: true
+  loop: "{{ _p.profile_ingress | default([]) }}"
+  loop_control:
+    label: "{{ item.port }}"
+  failed_when: false
+  when: _p is defined
+
+- name: "Rückbau | gemeldet"
+  ansible.builtin.debug:
+    msg: "Profil {{ profile_name }} zurückgebaut (Audit/Drop-in/Ingress entfernt)."

@@ -1,0 +1,146 @@
+---
+# Wendet EIN Profil an (profile_name). Definition wird namespaced nach _p geladen,
+# damit zwischen Profilen nichts durchleakt.
+
+- name: "Profile | Definition laden"
+  ansible.builtin.include_vars:
+    file: "{{ playbook_dir }}/profiles/{{ profile_name }}.yml"
+    name: _p
+
+- name: "Profile | Erwartete Ports um Profil-Ingress ergänzen"
+  ansible.builtin.set_fact:
+    anvil_expected_ports: >-
+      {{ (anvil_expected_ports | default([])) +
+         ((_p.profile_ingress | default([])) | map(attribute='port') | map('string') | list) }}
+
+- name: "Profile | Dienst-Präsenz prüfen"
+  ansible.builtin.command: "systemctl cat {{ _p.profile_service }}"
+  register: anvil_svc_cat
+  changed_when: false
+  failed_when: false
+  when: (_p.profile_service | default('')) | length > 0
+
+- name: "Profile | Präsenz-Flag setzen"
+  ansible.builtin.set_fact:
+    anvil_svc_present: "{{ (_p.profile_service | default('')) | length > 0 and (anvil_svc_cat.rc | default(1)) == 0 }}"
+
+- name: "Profile | Ingress-Freigaben (ufw)"
+  community.general.ufw:
+    rule: "{{ item.rule | default('allow') }}"
+    port: "{{ item.port | string }}"
+    proto: "{{ item.proto | default('tcp') }}"
+    from_ip: "{{ item.from_ip | default(omit) }}"
+    comment: "anvil profile {{ profile_name }}: {{ item.comment | default(item.port) }}"
+  loop: "{{ _p.profile_ingress | default([]) }}"
+  loop_control:
+    label: "{{ item.port }}/{{ item.proto | default('tcp') }}"
+  when: firewall_enabled | bool
+
+- name: "Profile | Egress-Freigaben (ufw, nur bei enforce)"
+  community.general.ufw:
+    rule: allow
+    direction: out
+    port: "{{ item.port | string }}"
+    proto: "{{ item.proto | default('tcp') }}"
+    comment: "anvil profile {{ profile_name }} egress: {{ item.comment | default(item.port) }}"
+  loop: "{{ _p.profile_egress | default([]) }}"
+  loop_control:
+    label: "{{ item.port }}"
+  when: firewall_egress_enforce | bool
+
+- name: "Profile | AppArmor-Profile enforcen (falls vorhanden)"  # noqa: command-instead-of-module
+  ansible.builtin.command: "aa-enforce {{ item }}"
+  loop: "{{ _p.profile_apparmor | default([]) }}"
+  changed_when: false
+  failed_when: false
+  when:
+    - enable_apparmor | bool
+    - not ansible_check_mode
+    - (_p.profile_apparmor | default([])) | length > 0
+
+# --- systemd-Sandbox ----------------------------------------------------------
+- name: "Profile | Sandbox-Drop-in-Verzeichnis"
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ _p.profile_service }}.d"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - anvil_svc_present | bool
+    - (_p.profile_sandbox | default({})) | length > 0
+
+- name: "Profile | systemd-Sandbox-Drop-in schreiben"
+  ansible.builtin.template:
+    src: sandbox.conf.j2
+    dest: "/etc/systemd/system/{{ _p.profile_service }}.d/anvil-sandbox.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  register: anvil_sandbox_dropin
+  when:
+    - anvil_svc_present | bool
+    - (_p.profile_sandbox | default({})) | length > 0
+
+- name: "Profile | daemon-reload + Dienst neu starten (Sandbox aktiv)"
+  ansible.builtin.systemd_service:
+    name: "{{ _p.profile_service }}"
+    daemon_reload: true
+    state: restarted
+  when:
+    - not ansible_check_mode
+    - anvil_sandbox_dropin is changed
+    - _p.profile_restart | default(true) | bool
+
+- name: "Profile | Sandbox ohne Auto-Restart (nur reload + Meldung)"
+  when:
+    - not ansible_check_mode
+    - anvil_sandbox_dropin is changed
+    - not (_p.profile_restart | default(true) | bool)
+  block:
+    - name: "Profile | daemon-reload (kein Restart)"
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+    - name: "Profile | Gotify: Restart nötig"
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/anvil-notify
+          - "--priority"
+          - "{{ notify_priority_warn }}"
+          - "--title"
+          - "Restart nötig: {{ _p.profile_service }}"
+          - "Sandbox-Drop-in für {{ _p.profile_service }} (Profil {{ profile_name }}) geändert — bitte manuell neu starten."
+      changed_when: false
+      failed_when: false
+      when: notify_enabled | bool
+
+# --- Datei-/Verzeichnisrechte -------------------------------------------------
+- name: "Profile | Datei-/Verzeichnisrechte"  # noqa: risky-file-permissions
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    owner: "{{ item.owner | default(omit) }}"
+    group: "{{ item.group | default(omit) }}"
+    mode: "{{ item.mode | default(omit) }}"
+  loop: "{{ _p.profile_paths | default([]) }}"
+  loop_control:
+    label: "{{ item.path }}"
+  failed_when: false
+
+# --- auditd-Watches -----------------------------------------------------------
+- name: "Profile | auditd-Regeln deployen"
+  ansible.builtin.template:
+    src: audit-profile.rules.j2
+    dest: "/etc/audit/rules.d/anvil-profile-{{ profile_name }}.rules"
+    owner: root
+    group: root
+    mode: "0640"
+  notify: Profiles load audit rules
+  when:
+    - enable_auditd | bool
+    - (_p.profile_audit | default([])) | length > 0
+
+# --- container-spezifisch (Docker) -------------------------------------------
+- name: "Profile | Docker-spezifische Härtung"
+  ansible.builtin.include_tasks: container_docker.yml
+  when: _p.profile_docker | default(false) | bool

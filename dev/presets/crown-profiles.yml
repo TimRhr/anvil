@@ -1,0 +1,16 @@
+---
+# dev-Preset: crown_jewels + App-Overlays (Phase 3).
+# Profile werden additiv angewendet; fehlt der Dienst (z.B. kein Docker/Caddy
+# installiert), greifen nur die Firewall-Teile (graceful skip). Drift-Erkennung
+# läuft immer.
+admin_user: devadmin
+admin_pubkeys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDdEvDevDevDevDevDevDevDevDevDevDevDevDevDev00 dev@anvil"
+anvil_posture: crown_jewels
+ssh_mfa_method: auto
+anvil_profiles:
+  - reverse_proxy
+  - container_host
+notify_enabled: false
+vault_gotify_url: ""
+vault_gotify_token: ""

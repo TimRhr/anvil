@@ -1,0 +1,11 @@
+*filter
+:DOCKER-USER - [0:0]
+-A DOCKER-USER -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN
+-A DOCKER-USER -i lo -j RETURN
+{% for p in docker_published_allow | default([]) %}
+-A DOCKER-USER -p tcp --dport {{ p }} -j RETURN
+-A DOCKER-USER -p udp --dport {{ p }} -j RETURN
+{% endfor %}
+-A DOCKER-USER -s 172.16.0.0/12 -j RETURN
+-A DOCKER-USER -j DROP
+COMMIT

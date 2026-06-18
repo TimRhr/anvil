@@ -98,6 +98,8 @@ Feature-Toggles stehen in [group_vars/all/main.yml](group_vars/all/main.yml) und
 - [docs/compliance-matrix.md](docs/compliance-matrix.md) — BSI ↔ CIS ↔ Anvil-Maßnahmen
 - [docs/threat-model.md](docs/threat-model.md) — Annahmen, Scope, bewusste Grenzen
 - [docs/security-audit.md](docs/security-audit.md) — Sicherheitsaudit der Baseline (Befunde + Schweregrade)
+- [docs/crown-jewels.md](docs/crown-jewels.md) — Kronjuwelen-Posture (Höchsthärtung)
+- [docs/profiles.md](docs/profiles.md) — App-Overlays/Profile (Dienst-spezifische Zusatzhärtung)
 - [ROADMAP.md](ROADMAP.md) — Weg zu Kronjuwelen-Härtung & wiederholbarem App-Schichten-Modell
 
 ---

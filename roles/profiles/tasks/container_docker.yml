@@ -1,0 +1,92 @@
+---
+# Docker-spezifische Härtung: daemon.json (Merge) + optionale DOCKER-USER-ufw.
+# dockerd wird NICHT auto-restartet (würde Container stoppen) -> nur melden.
+
+- name: "Docker | docker installiert?"
+  ansible.builtin.command: docker --version
+  register: anvil_docker_ver
+  changed_when: false
+  failed_when: false
+
+- name: "Docker | Hinweis, wenn docker fehlt"
+  ansible.builtin.debug:
+    msg: "docker nicht gefunden — container_host-Härtung übersprungen."
+  when: (anvil_docker_ver.rc | default(1)) != 0
+
+- name: "Docker | daemon.json härten"
+  when: (anvil_docker_ver.rc | default(1)) == 0
+  block:
+    - name: "Docker | /etc/docker sicherstellen"
+      ansible.builtin.file:
+        path: /etc/docker
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: "Docker | bestehende daemon.json lesen"
+      ansible.builtin.slurp:
+        src: /etc/docker/daemon.json
+      register: anvil_docker_daemon_raw
+      failed_when: false
+      changed_when: false
+
+    - name: "Docker | daemon.json zusammenführen & schreiben"
+      ansible.builtin.copy:
+        dest: /etc/docker/daemon.json
+        owner: root
+        group: root
+        mode: "0644"
+        content: >-
+          {{ (((anvil_docker_daemon_raw.content | b64decode | from_json)
+               if (anvil_docker_daemon_raw.content is defined
+                   and (anvil_docker_daemon_raw.content | b64decode | trim) | length > 0)
+               else {})
+              | combine(docker_hardening, recursive=true)) | to_nice_json }}
+      register: anvil_docker_daemon_written
+
+    - name: "Docker | Gotify: dockerd-Restart nötig"
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/anvil-notify
+          - "--priority"
+          - "{{ notify_priority_warn }}"
+          - "--title"
+          - "Docker: Restart nötig"
+          - "daemon.json wurde gehärtet — dockerd manuell neu starten (Container werden dabei gestoppt!)."
+      changed_when: false
+      failed_when: false
+      when:
+        - anvil_docker_daemon_written is changed
+        - notify_enabled | bool
+        - not ansible_check_mode
+
+# --- DOCKER-USER-ufw-Integration (opt-in) ------------------------------------
+- name: "Docker | DOCKER-USER-Block in after.rules (opt-in)"
+  ansible.builtin.blockinfile:
+    path: /etc/ufw/after.rules
+    marker: "# {mark} ANVIL DOCKER-USER"
+    block: "{{ lookup('template', 'docker-ufw.rules.j2') }}"
+    insertafter: EOF
+    create: false
+  register: anvil_docker_ufw
+  when:
+    - docker_restrict_published | bool
+    - (anvil_docker_ver.rc | default(1)) == 0
+
+- name: "Docker | DOCKER-USER-Block entfernen (deaktiviert)"
+  ansible.builtin.blockinfile:
+    path: /etc/ufw/after.rules
+    marker: "# {mark} ANVIL DOCKER-USER"
+    state: absent
+  register: anvil_docker_ufw_rm
+  failed_when: false
+  when: not (docker_restrict_published | bool)
+
+- name: "Docker | ufw neu laden (DOCKER-USER geändert)"  # noqa: command-instead-of-module
+  ansible.builtin.command: ufw reload
+  changed_when: false
+  failed_when: false
+  when:
+    - not ansible_check_mode
+    - (anvil_docker_ufw is changed) or (anvil_docker_ufw_rm is changed)

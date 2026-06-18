@@ -1,0 +1,40 @@
+---
+# =============================================================================
+# profiles/container_host.yml — Overlay für einen Container-Host (Docker)
+#
+# Härtet den Docker-Daemon (daemon.json wird in vorhandene Config GEMERGT) und
+# bietet optional die DOCKER-USER-Firewall-Integration, damit veröffentlichte
+# Container-Ports der ufw unterliegen (Docker umgeht ufw sonst!).
+#
+# WICHTIG: dockerd wird NICHT automatisch neugestartet (würde alle Container
+# stoppen) — Anvil meldet stattdessen via Gotify, dass ein Neustart nötig ist.
+#
+# Für Podman (rootless) ist dieses Profil weitgehend unnötig — siehe docs/profiles.md.
+# =============================================================================
+
+profile_service: docker.service
+
+# Veröffentlichte Container-Ports deklarierst du über docker_published_allow
+# (group_vars) — NICHT hier. profile_ingress bleibt leer, da Docker eigene
+# iptables-Ketten nutzt.
+profile_ingress: []
+profile_egress: []
+profile_apparmor: []
+
+# dockerd selbst NICHT per systemd sandboxen (braucht weitreichende Rechte).
+profile_sandbox: {}
+
+# Konfigurationsrechte
+profile_paths:
+  - { path: /etc/docker, owner: root, group: root, mode: "0755" }
+
+# auditd-Watch auf die Docker-Konfiguration
+profile_audit:
+  - { path: /etc/docker, perms: wa, key: docker-config }
+  - { path: /usr/bin/dockerd, perms: x, key: docker-bin }
+
+# dockerd nie auto-restarten (killt Container) -> nur melden
+profile_restart: false
+
+# Aktiviert die container-spezifische Logik (daemon.json + DOCKER-USER) im Motor
+profile_docker: true

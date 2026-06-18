@@ -133,6 +133,15 @@ build_extra_vars() {
   done
   keys_json="[${keys_json%,}]"
 
+  # App-Overlay-Profile (Bash-Array ANVIL_PROFILES) → JSON-Array.
+  local profiles_json="" p
+  for p in "${ANVIL_PROFILES[@]:-}"; do
+    [[ -z "${p// /}" ]] && continue
+    [[ "$p" =~ ^[a-z0-9_-]+$ ]] || die "Ungültiger Profilname in ANVIL_PROFILES: '$p'"
+    profiles_json+="\"$p\","
+  done
+  profiles_json="[${profiles_json%,}]"
+
   # Bash-Bool (true/false-String) → JSON-Bool. $2 = Default, falls nicht gesetzt
   # (muss dem Default in group_vars/all/main.yml entsprechen!).
   jb() { local v="${!1:-$2}"; [[ "$v" == "true" ]] && echo true || echo false; }
@@ -156,7 +165,8 @@ build_extra_vars() {
   "anvil_hostname": "${ANVIL_HOSTNAME:-}",
   "timezone": "${ANVIL_TIMEZONE:-Europe/Berlin}",
   "anvil_posture": "${ANVIL_POSTURE:-baseline}",
-  "ssh_mfa_method": "${ANVIL_SSH_MFA:-auto}"
+  "ssh_mfa_method": "${ANVIL_SSH_MFA:-auto}",
+  "anvil_profiles": ${profiles_json}
 }
 EOF
 }
@@ -230,6 +240,17 @@ do_rollback() {
     warn "sshd-Konfiguration nach Rollback ungültig — bitte manuell prüfen!"
   fi
   sysctl --system >/dev/null 2>&1 || true
+
+  # RB-1: systemd-Drop-ins neu einlesen und betroffene Dienste reaktivieren,
+  # damit zurückgerollte Konfiguration auch greift (best effort).
+  log "Reaktiviere betroffene Dienste …"
+  systemctl daemon-reload 2>/dev/null || true
+  local svc
+  for svc in ufw fail2ban chrony systemd-journald; do
+    systemctl reload "$svc" 2>/dev/null || systemctl try-restart "$svc" 2>/dev/null || true
+  done
+  service auditd restart 2>/dev/null || true
+
   ok "Rollback abgeschlossen. Bei Bedarf System neu starten."
 }
 

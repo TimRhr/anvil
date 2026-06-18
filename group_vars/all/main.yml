@@ -35,6 +35,27 @@ kernel_disable_module_loading: false
 # Posture-Benachrichtigung: Erwähne im crown-Modus die aktivierten Maßnahmen.
 anvil_notify_posture: true
 
+# --- App-Overlays / Profile (Phase 3, siehe docs/profiles.md) -----------------
+# Liste aktiver Dienst-Profile; je Eintrag eine Datei profiles/<name>.yml.
+# Wird i.d.R. aus config/anvil.conf (ANVIL_PROFILES) via -e gesetzt.
+anvil_profiles: []
+# Drift-Erkennung: unerwartete lauschende Ports melden (kein Blockieren).
+profiles_drift_detect: true
+# container_host: Docker-daemon.json-Härtung (wird in vorhandene Config gemerged).
+docker_hardening:
+  no-new-privileges: true
+  icc: false
+  live-restore: true
+  userland-proxy: false
+  log-driver: json-file
+  log-opts:
+    max-size: "10m"
+    max-file: "5"
+# DOCKER-USER-Firewall: veröffentlichte Container-Ports der ufw unterwerfen.
+# Default AUS (würde sonst Container-Netzwerk einschränken) — bewusst opt-in.
+docker_restrict_published: false
+docker_published_allow: []   # Ports, die DOCKER-USER von außen zulässt
+
 # --- Admin-/Standard-User -----------------------------------------------------
 # Werden i.d.R. aus config/anvil.conf via -e gesetzt. Defaults hier als Fallback.
 admin_user: admin

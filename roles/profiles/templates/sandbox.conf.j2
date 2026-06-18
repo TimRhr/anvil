@@ -1,0 +1,6 @@
+# Anvil-managed — systemd-Sandbox-Drop-in für {{ _p.profile_service }}
+# Profil: {{ profile_name }}. Nicht manuell editieren.
+[Service]
+{% for key, value in (_p.profile_sandbox | default({})) | dictsort %}
+{{ key }}={{ value }}
+{% endfor %}

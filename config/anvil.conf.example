@@ -31,6 +31,13 @@ ANVIL_POSTURE="baseline"
 # SSH-Multi-Faktor: "auto" (crown→fido2/baseline→none), "none", "fido2", "totp".
 ANVIL_SSH_MFA="auto"
 
+# --- App-Overlays / Profile (siehe docs/profiles.md) ---------------------------
+# Dienst-spezifische Zusatzhärtung für später installierte Tools. Jeder Eintrag
+# braucht eine Datei profiles/<name>.yml. Mehrfach-Lauf wendet sie additiv an;
+# entfernte Einträge werden beim nächsten Lauf wieder zurückgebaut.
+# Verfügbar: reverse_proxy, container_host
+ANVIL_PROFILES=()
+
 # --- Feature-Toggles (übersteuern group_vars/all/main.yml) --------------------
 ENABLE_FAIL2BAN=true
 ENABLE_AIDE=true

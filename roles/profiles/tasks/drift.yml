@@ -1,0 +1,57 @@
+---
+# Drift-Erkennung: lauschende Nicht-loopback-Ports gegen die erwarteten Ports
+# (SSH + firewall_extra_rules + Profile-Ingress) prüfen. NUR MELDEN, kein Eingriff.
+
+- name: "Drift | Lauschende Nicht-loopback-Ports erfassen"
+  ansible.builtin.shell:
+    executable: /bin/bash
+    cmd: |
+      set -o pipefail
+      ss -tlnH 2>/dev/null | awk '{print $4}' \
+        | grep -vE '^(127\.|\[?::1\]?:)' \
+        | sed -E 's/.*:([0-9]+)$/\1/' | sort -un
+  register: anvil_drift_ports
+  changed_when: false
+  failed_when: false
+
+- name: "Drift | Unerwartete (ungedeckte) Ports bestimmen"
+  ansible.builtin.set_fact:
+    anvil_drift_unexpected: "{{ (anvil_drift_ports.stdout_lines | default([])) | difference(anvil_expected_ports | default([])) }}"
+
+- name: "Drift | Report schreiben"
+  ansible.builtin.copy:
+    dest: "{{ anvil_report_dir }}/drift-{{ ansible_facts['date_time'].date | default('unknown') }}.txt"
+    owner: root
+    group: root
+    mode: "0640"
+    content: |
+      Anvil Drift-Report — {{ ansible_facts['date_time'].iso8601 | default('') }}
+      Host: {{ ansible_facts['hostname'] | default('') }} | Posture: {{ anvil_posture }}
+      Aktive Profile: {{ anvil_profiles | default([]) | join(', ') or '(keine)' }}
+      Erwartete Ports: {{ anvil_expected_ports | default([]) | join(', ') }}
+      Lauschend (nicht-loopback): {{ anvil_drift_ports.stdout_lines | default([]) | join(', ') or '(keine)' }}
+      UNGEDECKT: {{ anvil_drift_unexpected | default([]) | join(', ') or '(keine)' }}
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: "Drift | Gotify-Warnung bei ungedeckten Ports"
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/anvil-notify
+      - "--priority"
+      - "{{ notify_priority_warn }}"
+      - "--title"
+      - "Drift: ungedeckte Dienste"
+      - "Nicht abgedeckte lauschende Ports auf {{ ansible_facts['hostname'] | default('host') }}: {{ anvil_drift_unexpected | join(', ') }}"
+  changed_when: false
+  failed_when: false
+  when:
+    - (anvil_drift_unexpected | default([])) | length > 0
+    - notify_enabled | bool
+    - not ansible_check_mode
+
+- name: "Drift | Ergebnis"
+  ansible.builtin.debug:
+    msg: >-
+      Drift: {{ (anvil_drift_unexpected | default([])) | length }} ungedeckte(r) Port(s):
+      {{ anvil_drift_unexpected | default([]) | join(', ') or '(keine)' }}

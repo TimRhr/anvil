@@ -68,6 +68,10 @@
       when: audit_lynis_enabled | bool
       tags: [audit]
 
+    # 11. App-Overlays / Profile (additiv) + Drift-Erkennung (läuft immer)
+    - role: profiles
+      tags: [profiles, drift]
+
   post_tasks:
     - name: "Anvil | Abschluss-Benachrichtigung (Gotify)"
       ansible.builtin.command:

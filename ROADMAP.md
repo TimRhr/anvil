@@ -80,26 +80,26 @@ Lockdown nach Reboot) — Aussperr-/Fallback-Schutz bleibt intakt, Verfügbarkei
 
 ---
 
-## Phase 3 — Schichten- & App-Modell (Wiederholbarkeit) ☐  ⭐ Kernanliegen
+## Phase 3 — Schichten- & App-Modell (Wiederholbarkeit) ◐  ⭐ Kernanliegen
 
 **Ziel:** Wenn später Tools/Dienste auf den Server kommen, läuft Anvil **erneut** und
 **erweitert** die Härtung passend zur neuen Umgebung — additiv, idempotent, ohne die
-Baseline zu brechen.
+Baseline zu brechen. Umgesetzt **datengetrieben**: deklarative `profiles/<name>.yml` +
+generischer Motor [`roles/profiles`](roles/profiles). Doku: [docs/profiles.md](docs/profiles.md).
 
-- ☐ **Overlay-Architektur**: Basis-Härtung bleibt; **Dienst-Overlays** als Rollen
-  `profiles/<name>` (z.B. `webserver`, `database`, `reverse_proxy`, `container_host`).
-  In `config/anvil.conf` deklarierbar: `ANVIL_PROFILES=(webserver database)`.
-- ☐ **Pro Overlay einheitlich**: nur benötigte Firewall-Ports öffnen (Egress/Ingress),
-  **dediziertes AppArmor-Profil**, **systemd-Sandboxing** (NoNewPrivileges, ProtectSystem,
-  PrivateTmp, CapabilityBoundingSet …), eigener Service-User, Datei-/Secret-Rechte,
-  dienstspezifische auditd-Regeln.
-- ☐ **Diff-/Drift-bewusst**: erneuter Lauf erkennt neue offene Ports/Dienste
-  (`ss -tlnp`) und **meldet ungehärtete Dienste** via Gotify (Lücke zwischen Ist und Profilen).
-- ☐ **Container/Workloads**: Overlay für Docker/Podman (rootless bevorzugt, Daemon-Härtung,
-  Netzwerk-Policy), Hinweis auf seccomp/AppArmor je Container.
-- ☐ **Re-Run-Sicherheit**: Overlays sind rein additiv und idempotent; `--tags profile:<name>`
-  zum gezielten (Neu-)Anwenden; Baseline-Rollen bleiben unverändert wiederholbar.
-- ☐ **Rollback-Vervollständigung (RB-1)**: alle betroffenen Dienste nach Rollback reaktivieren.
+- ☑ **Overlay-Architektur**: Baseline bleibt; Auswahl via `ANVIL_PROFILES=(...)`. Erste
+  Profile: [`reverse_proxy`](profiles/reverse_proxy.yml), [`container_host`](profiles/container_host.yml).
+- ☑ **Pro Overlay einheitlich**: Firewall-Ingress/Egress, AppArmor-Enforce, systemd-Sandbox-
+  Drop-in (NoNewPrivileges/ProtectSystem/…), Datei-/Secret-Rechte, dienstspezifische auditd-Regeln.
+- ☑ **Diff-/Drift-bewusst**: jeder Lauf vergleicht `ss -tlnH` mit erwarteten Ports (SSH +
+  Extra + Profile) und meldet ungedeckte Dienste via Gotify + Report (**nur Meldung**).
+- ☑ **Container/Workloads**: `container_host` — daemon.json-Härtung (Merge), DOCKER-USER/ufw-
+  Integration (opt-in, da Docker ufw umgeht), Podman-rootless als Empfehlung; dockerd kein Auto-Restart.
+- ☑ **Re-Run-Sicherheit**: additiv/idempotent; `--tags profiles`; abgewählte Profile werden
+  zurückgebaut (`remove_profile`); Baseline unverändert wiederholbar.
+- ☑ **Rollback-Vervollständigung (RB-1)**: `--rollback` macht daemon-reload + reaktiviert
+  betroffene Dienste (ufw/fail2ban/chrony/journald/auditd/sshd).
+- ☐ **VM-Abnahme**: End-to-End in einer VM (Docker+Container, Caddy) — via `dev/dev.sh apply crown-profiles`.
 
 **Akzeptanz:** Nach Installation eines neuen Dienstes hebt `sudo ./bootstrap.sh apply`
 (mit aktivem Profil) genau dessen Absicherung an — Ports minimal, AppArmor/Sandbox aktiv,
