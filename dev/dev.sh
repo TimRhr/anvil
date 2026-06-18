@@ -73,6 +73,12 @@ ensure_lint_venv() {
   if [[ ! -x "$LINT_VENV/bin/ansible-lint" ]]; then
     section "Lint-venv einrichten (einmalig)"
     require_cmd python3 || die "python3 nicht gefunden."
+    # python3-venv (ensurepip) bei Bedarf automatisch nachinstallieren.
+    if ! python3 -c 'import ensurepip' >/dev/null 2>&1; then
+      log "python3-venv fehlt — installiere automatisch via apt …"
+      sudo DEBIAN_FRONTEND=noninteractive apt-get update -q
+      sudo DEBIAN_FRONTEND=noninteractive apt-get install -y python3-venv python3-pip
+    fi
     run python3 -m venv "$LINT_VENV"
     run "$LINT_VENV/bin/pip" install --quiet --upgrade pip
     run "$LINT_VENV/bin/pip" install --quiet yamllint ansible-lint shellcheck-py
@@ -90,6 +96,12 @@ ensure_ansible() {
   log "ansible-playbook fehlt — installiere via apt …"
   sudo DEBIAN_FRONTEND=noninteractive apt-get update -q
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ansible
+}
+
+# Playbook als root ausführen (become wird damit zum No-op; kein passwordless
+# sudo für become nötig). Relevante Env-Variablen werden durchgereicht.
+run_playbook() {
+  sudo --preserve-env=ANSIBLE_CONFIG,ANSIBLE_COLLECTIONS_PATH ansible-playbook "$@"
 }
 
 # Sicherheitsabfrage vor lokalen Änderungen.
@@ -112,10 +124,10 @@ local_guard() {
 local_apply() {
   local f="$1" preset; preset="$(basename "$f" .yml)"
   section "$preset: Lauf A (Konvergenz)"
-  ansible-playbook -i "$REPO_ROOT/inventory.ini" "$REPO_ROOT/site.yml" -e "@$f"
+  run_playbook -i "$REPO_ROOT/inventory.ini" "$REPO_ROOT/site.yml" -e "@$f"
   section "$preset: Lauf B (Idempotenz)"
   local logf; logf="$(mktemp)"
-  ansible-playbook -i "$REPO_ROOT/inventory.ini" "$REPO_ROOT/site.yml" -e "@$f" | tee "$logf"
+  run_playbook -i "$REPO_ROOT/inventory.ini" "$REPO_ROOT/site.yml" -e "@$f" | tee "$logf"
   local rl ch fa
   rl="$(grep -E 'ok=[0-9]+.*changed=[0-9]+' "$logf" | tail -n1 || true)"
   ch="$(echo "$rl" | grep -oP 'changed=\K[0-9]+' || echo '?')"
@@ -130,6 +142,7 @@ cmd_list() { list_presets; }
 
 cmd_vars() {
   local f; f="$(preset_file "${1:-}")"
+  ensure_ansible
   section "Aufgelöste Variablen — Preset $(basename "$f" .yml)"
   ansible-playbook -i "$REPO_ROOT/inventory.ini" "$DEV_DIR/dump-vars.yml" -e "@$f"
 }
@@ -158,11 +171,9 @@ cmd_lint() {
 
 cmd_check() {
   local f; f="$(preset_file "${1:-}")"
-  ensure_lint_venv
+  ensure_ansible
   section "Dry-Run (--check --diff) — Preset $(basename "$f" .yml) — KEINE Änderungen"
-  sudo --preserve-env=ANSIBLE_CONFIG,ANSIBLE_COLLECTIONS_PATH \
-    "$LINT_VENV/bin/ansible-playbook" -i "$REPO_ROOT/inventory.ini" "$REPO_ROOT/site.yml" \
-    --check --diff -e "@$f"
+  run_playbook -i "$REPO_ROOT/inventory.ini" "$REPO_ROOT/site.yml" --check --diff -e "@$f"
 }
 
 cmd_apply() {
@@ -208,7 +219,7 @@ cmd_totp_test() {
   sudo chmod 600 /etc/users.oath
 
   section "Apply crown-totp-enrolled (TOTP ENFORCED)"
-  ansible-playbook -i "$REPO_ROOT/inventory.ini" "$REPO_ROOT/site.yml" -e "@$f"
+  run_playbook -i "$REPO_ROOT/inventory.ini" "$REPO_ROOT/site.yml" -e "@$f"
 
   section "Konfig-Prüfung"
   if sudo grep -q 'pam_oath.so' /etc/pam.d/sshd; then ok "pam_oath im sshd-PAM"; else die "pam_oath fehlt"; fi
