@@ -1,0 +1,19 @@
+# {{ ansible_managed }}
+# Anvil -> SIEM ({{ siem_host }}:{{ siem_syslog_port }}/{{ siem_syslog_protocol }})
+# Verlustarm dank Disk-Buffer-Queue (außer udp).
+{% if siem_syslog_protocol == 'tls' %}
+global(DefaultNetstreamDriver="gtls")
+# Hinweis: TLS erfordert hinterlegte CA-/Client-Zertifikate auf dem Host.
+action(type="omfwd" target="{{ siem_host }}" port="{{ siem_syslog_port }}" protocol="tcp"
+       StreamDriver="gtls" StreamDriverMode="1" StreamDriverAuthMode="x509/name"
+       queue.type="LinkedList" queue.filename="anvil_siem"
+       queue.maxdiskspace="512m" queue.saveonshutdown="on"
+       action.resumeRetryCount="-1")
+{% elif siem_syslog_protocol == 'udp' %}
+action(type="omfwd" target="{{ siem_host }}" port="{{ siem_syslog_port }}" protocol="udp")
+{% else %}
+action(type="omfwd" target="{{ siem_host }}" port="{{ siem_syslog_port }}" protocol="tcp"
+       queue.type="LinkedList" queue.filename="anvil_siem"
+       queue.maxdiskspace="512m" queue.saveonshutdown="on"
+       action.resumeRetryCount="-1")
+{% endif %}

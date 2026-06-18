@@ -65,6 +65,23 @@ compliance_randomized_delay: 1800
 # Zusätzlich beim Anvil-Lauf sofort einen Statusbericht senden?
 compliance_report_on_apply: true
 
+# --- SIEM-Anbindung (optional, siehe docs/siem.md) ----------------------------
+# Pluggable Log-/Event-Weiterleitung an ein SIEM:
+#   none   = aus (Default)
+#   syslog = rsyslog-Forward + auditd->syslog (jedes SIEM: Wazuh, Graylog, …)
+#   wazuh  = Wazuh-Agent (FIM/SCA/Active-Response, liest audit.log nativ)
+siem_provider: none
+siem_host: ""                 # SIEM-/Wazuh-Manager-Adresse (Pflicht außer none)
+# -- syslog-Provider --
+siem_syslog_port: 514
+siem_syslog_protocol: tcp     # tcp | tls (tls braucht hinterlegte Zertifikate)
+siem_audit_forward: true      # auditd-Events zusätzlich via syslog weiterleiten
+# -- wazuh-Provider --
+siem_wazuh_version: ""        # leer = neueste 4.x; oder z.B. "4.9.2-1"
+siem_wazuh_agent_group: default
+# Optionales Registrierungs-Passwort (Wazuh authd) aus dem Vault:
+siem_wazuh_registration_password: "{{ vault_wazuh_registration_password | default('') }}"
+
 # --- Admin-/Standard-User -----------------------------------------------------
 # Werden i.d.R. aus config/anvil.conf via -e gesetzt. Defaults hier als Fallback.
 admin_user: admin

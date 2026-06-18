@@ -1,0 +1,75 @@
+---
+# Wazuh-Agent installieren + auf den Manager (siem_host) ausrichten.
+# Der Agent liest /var/log/audit/audit.log und Logs nativ (kein Syslog-Plumbing).
+
+- name: "SIEM/wazuh | Voraussetzungen"
+  ansible.builtin.apt:
+    name:
+      - curl
+      - gnupg
+      - apt-transport-https
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [siem]
+
+- name: "SIEM/wazuh | keyrings-Verzeichnis"
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [siem]
+
+- name: "SIEM/wazuh | GPG-Key importieren (dearmored)"
+  ansible.builtin.shell:
+    cmd: "set -o pipefail; curl -fsSL https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --dearmor > /etc/apt/keyrings/wazuh.gpg"
+    creates: /etc/apt/keyrings/wazuh.gpg
+  tags: [siem]
+
+- name: "SIEM/wazuh | apt-Repository eintragen"
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main"
+    filename: wazuh
+    state: present
+  tags: [siem]
+
+- name: "SIEM/wazuh | wazuh-agent installieren"
+  ansible.builtin.apt:
+    name: "wazuh-agent{{ ('=' + siem_wazuh_version) if (siem_wazuh_version | length > 0) else '' }}"
+    state: present
+    update_cache: true
+  environment:
+    WAZUH_MANAGER: "{{ siem_host }}"
+    WAZUH_AGENT_GROUP: "{{ siem_wazuh_agent_group }}"
+  tags: [siem]
+
+- name: "SIEM/wazuh | Manager-Adresse in ossec.conf setzen (idempotent)"
+  ansible.builtin.replace:
+    path: /var/ossec/etc/ossec.conf
+    regexp: '<address>.*?</address>'
+    replace: "<address>{{ siem_host }}</address>"
+  notify: SIEM restart wazuh-agent
+  tags: [siem]
+
+- name: "SIEM/wazuh | Registrierungspasswort hinterlegen (optional)"
+  ansible.builtin.copy:
+    content: "{{ siem_wazuh_registration_password }}\n"
+    dest: /var/ossec/etc/authd.pass
+    owner: root
+    group: wazuh
+    mode: "0640"
+  no_log: true
+  when: siem_wazuh_registration_password | length > 0
+  notify: SIEM restart wazuh-agent
+  tags: [siem]
+
+- name: "SIEM/wazuh | Agent aktivieren & starten"
+  ansible.builtin.systemd_service:
+    name: wazuh-agent
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode
+  tags: [siem]

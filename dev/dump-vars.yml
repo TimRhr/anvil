@@ -36,3 +36,5 @@
           - "audit_lynis_enabled ...... {{ audit_lynis_enabled }}"
           - "anvil_profiles .......... {{ anvil_profiles | default([]) }}"
           - "docker_restrict_published {{ docker_restrict_published }}"
+          - "siem_provider ........... {{ siem_provider }} -> {{ siem_host | default('') }}"
+          - "compliance_schedule ..... {{ compliance_schedule_enabled }} ({{ compliance_oncalendar }})"

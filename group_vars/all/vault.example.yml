@@ -21,6 +21,10 @@ vault_gotify_token: "AxxxxxxxxxxxxxX"
 # Klartext-Passwort; Anvil erzeugt daraus den PBKDF2-Hash für grub.cfg.
 vault_grub_password: "EinStarkesGrubPasswort!"
 
+# --- Wazuh-Agent-Registrierungspasswort (nur siem_provider=wazuh, optional) ----
+# Nur nötig, wenn der Wazuh-Manager authd mit Passwort verlangt. Sonst leer/auskommentiert.
+# vault_wazuh_registration_password: "GeheimesEnrollPW"
+
 # --- Admin-Passwort-Hash (Crown-Jewels-Posture, sudo PR-2) --------------------
 # Wird benötigt, wenn admin_sudo_nopasswd=false (Default) in der crown_jewels-
 # Posture. Erzeuge den Hash mit: mkpasswd -m sha-512

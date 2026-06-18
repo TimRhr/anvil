@@ -1,0 +1,52 @@
+---
+# Generischer Syslog-Forward an ein SIEM (jedes SIEM, das Syslog annimmt) +
+# auditd-Events via syslog-Plugin, damit Audit-Logs im SIEM landen.
+
+- name: "SIEM/syslog | rsyslog sicherstellen"
+  ansible.builtin.apt:
+    name: rsyslog
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [siem]
+
+- name: "SIEM/syslog | Forward-Konfiguration deployen"
+  ansible.builtin.template:
+    src: rsyslog-siem.conf.j2
+    dest: /etc/rsyslog.d/95-anvil-siem.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: SIEM restart rsyslog
+  tags: [siem]
+
+# --- auditd-Events zusätzlich via syslog weiterleiten ------------------------
+- name: "SIEM/syslog | audispd-plugins (auditd->syslog)"
+  ansible.builtin.apt:
+    name: audispd-plugins
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: siem_audit_forward | bool
+  tags: [siem]
+
+- name: "SIEM/syslog | auditd-syslog-Plugin-Pfad ermitteln"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - /etc/audit/plugins.d/syslog.conf
+    - /etc/audisp/plugins.d/syslog.conf
+  register: anvil_audisp_paths
+  when: siem_audit_forward | bool
+  tags: [siem]
+
+- name: "SIEM/syslog | auditd-syslog-Plugin aktivieren"
+  ansible.builtin.lineinfile:
+    path: "{{ (anvil_audisp_paths.results | selectattr('stat.exists') | map(attribute='stat.path') | list | first) }}"
+    regexp: '^active\s*='
+    line: "active = yes"
+  notify: SIEM restart auditd
+  when:
+    - siem_audit_forward | bool
+    - anvil_audisp_paths.results | selectattr('stat.exists') | list | length > 0
+  tags: [siem]

@@ -44,6 +44,12 @@ ANVIL_PROFILES=()
 # in group_vars/all/main.yml compliance_schedule_enabled=false.
 ANVIL_COMPLIANCE_SCHEDULE="Sun *-*-* 04:00:00"
 
+# --- SIEM-Anbindung (optional, siehe docs/siem.md) -----------------------------
+# none = aus | syslog = rsyslog-Forward+auditd (jedes SIEM) | wazuh = Wazuh-Agent
+ANVIL_SIEM_PROVIDER="none"
+ANVIL_SIEM_HOST=""            # SIEM-/Wazuh-Manager-Adresse (Pflicht außer none)
+# Weitere Feinheiten (Port/Protokoll, Wazuh-Version/Gruppe) in group_vars/all/main.yml.
+
 # --- Feature-Toggles (übersteuern group_vars/all/main.yml) --------------------
 ENABLE_FAIL2BAN=true
 ENABLE_AIDE=true

@@ -81,7 +81,7 @@ Feature-Toggles stehen in [group_vars/all/main.yml](group_vars/all/main.yml) und
 
 ## Voraussetzungen
 
-- Debian 11/12 oder Ubuntu 20.04/22.04/24.04/26.04
+- Ubuntu 24.04/26.04
 - root- bzw. sudo-Zugang
 - Netzwerkzugang für die **einmalige** Ansible-Installation (danach läuft alles lokal/offline)
 - Erreichbarer Gotify-Server für Benachrichtigungen (optional, aber empfohlen)
@@ -100,14 +100,5 @@ Feature-Toggles stehen in [group_vars/all/main.yml](group_vars/all/main.yml) und
 - [docs/security-audit.md](docs/security-audit.md) — Sicherheitsaudit der Baseline (Befunde + Schweregrade)
 - [docs/crown-jewels.md](docs/crown-jewels.md) — Kronjuwelen-Posture (Höchsthärtung)
 - [docs/profiles.md](docs/profiles.md) — App-Overlays/Profile (Dienst-spezifische Zusatzhärtung)
+- [docs/siem.md](docs/siem.md) — SIEM-Anbindung (Syslog generisch oder Wazuh-Agent)
 - [ROADMAP.md](ROADMAP.md) — Weg zu Kronjuwelen-Härtung & wiederholbarem App-Schichten-Modell
-
----
-
-## Sicherheitshinweise
-
-```
-⚠️  group_vars/all/vault.yml  → nur verschlüsselt committen (ansible-vault)
-⚠️  .vault_pass               → NIEMALS committen (.gitignore vorhanden)
-⚠️  config/anvil.conf         → enthält nur PUBLIC Keys; Secrets gehören in den Vault
-```

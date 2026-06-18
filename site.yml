@@ -76,6 +76,11 @@
     - role: compliance
       tags: [compliance]
 
+    # 13. SIEM-Anbindung (optional: syslog-Forward oder Wazuh-Agent)
+    - role: siem
+      when: siem_provider != 'none'
+      tags: [siem]
+
   post_tasks:
     - name: "Anvil | Abschluss-Benachrichtigung (Gotify)"
       ansible.builtin.command:

@@ -1,0 +1,38 @@
+---
+# =============================================================================
+# roles/siem — optionale SIEM-Anbindung (pluggable)
+#   syslog = rsyslog-Forward + auditd->syslog (jedes SIEM)
+#   wazuh  = Wazuh-Agent (liest audit.log/Logs nativ, FIM/SCA/Active-Response)
+# Die Rolle läuft nur, wenn siem_provider != none (site.yml).
+# =============================================================================
+
+- name: "SIEM | Provider gültig?"
+  ansible.builtin.assert:
+    that: siem_provider in ['none', 'syslog', 'wazuh']
+    fail_msg: "siem_provider='{{ siem_provider }}' ungültig — erlaubt: none, syslog, wazuh."
+    quiet: true
+  tags: [siem]
+
+- name: "SIEM | siem_host gesetzt?"
+  ansible.builtin.assert:
+    that: siem_host | length > 0
+    fail_msg: "siem_provider={{ siem_provider }} erfordert siem_host (SIEM-/Manager-Adresse)."
+    quiet: true
+  when: siem_provider != 'none'
+  tags: [siem]
+
+- name: "SIEM | Syslog-Forwarding (generisch)"
+  ansible.builtin.include_tasks: syslog.yml
+  when: siem_provider == 'syslog'
+  tags: [siem]
+
+- name: "SIEM | Wazuh-Agent"
+  ansible.builtin.include_tasks: wazuh.yml
+  when: siem_provider == 'wazuh'
+  tags: [siem]
+
+- name: "SIEM | ✅ aktiv"
+  ansible.builtin.debug:
+    msg: "SIEM-Anbindung: {{ siem_provider }} -> {{ siem_host }}"
+  when: siem_provider != 'none'
+  tags: [siem]

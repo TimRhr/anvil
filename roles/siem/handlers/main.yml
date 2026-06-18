@@ -1,0 +1,18 @@
+---
+- name: SIEM restart rsyslog
+  ansible.builtin.service:
+    name: rsyslog
+    state: restarted
+  when: not ansible_check_mode
+
+- name: SIEM restart auditd  # noqa: command-instead-of-module
+  # auditd lässt sich nicht via systemd-Modul neustarten -> service-Tool nutzen
+  ansible.builtin.command: service auditd restart
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: SIEM restart wazuh-agent
+  ansible.builtin.systemd_service:
+    name: wazuh-agent
+    state: restarted
+  when: not ansible_check_mode

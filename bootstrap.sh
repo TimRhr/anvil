@@ -169,6 +169,8 @@ build_extra_vars() {
   "anvil_posture": "${ANVIL_POSTURE:-baseline}",
   "ssh_mfa_method": "${ANVIL_SSH_MFA:-auto}",
   "compliance_oncalendar": "${ANVIL_COMPLIANCE_SCHEDULE:-Sun *-*-* 04:00:00}",
+  "siem_provider": "${ANVIL_SIEM_PROVIDER:-none}",
+  "siem_host": "${ANVIL_SIEM_HOST:-}",
   "anvil_profiles": ${profiles_json}
 }
 EOF
