@@ -251,6 +251,36 @@ SSH-Zugang nach einem Lauf nicht funktioniert:
 Häufige Ursachen: kein gültiger Key in `config/anvil.conf`, falscher `SSH_PORT`,
 Firewall. Die `preflight`-Rolle verhindert die meisten dieser Fälle vorab.
 
+### „Connection refused" auf dem konfigurierten Port (socket-aktiviertes SSH)
+
+Auf **Ubuntu 22.10+/24.04/26.04** ist SSH **socket-aktiviert** (`ssh.socket`). Dann
+bestimmt die Socket den Listen-Port — `Port` in `sshd_config` wird **ignoriert**.
+Wer nur `SSH_PORT` ändert, ohne die Socket anzupassen, sperrt sich aus: auf dem neuen
+Port lauscht nichts (`Connection refused`), Port 22 ist per Firewall zu (`timeout`).
+
+> Anvil richtet die Socket seit der ssh.socket-Behandlung automatisch auf `ssh_port`
+> aus (`/etc/systemd/system/ssh.socket.d/10-anvil-port.conf`). Manuelle Diagnose/Recovery
+> über die Konsole:
+
+```bash
+systemctl is-active ssh.socket            # active = socket-aktiviert
+ss -tlnp | grep -E ':(22|<dein-port>)'    # worauf lauscht sshd wirklich?
+sudo sshd -T | grep -i '^port'            # von sshd genutzter Port
+
+# Socket auf den richtigen Port binden:
+sudo install -d /etc/systemd/system/ssh.socket.d
+printf '[Socket]\nListenStream=\nListenStream=2222\n' \
+  | sudo tee /etc/systemd/system/ssh.socket.d/10-anvil-port.conf
+sudo systemctl daemon-reload && sudo systemctl restart ssh.socket
+ss -tlnp | grep ':2222'                   # jetzt belegt?
+```
+
+Alternativ Socket-Aktivierung abschalten und sshd direkt lauschen lassen
+(`sudo systemctl disable --now ssh.socket && sudo systemctl enable --now ssh.service`)
+— dann gilt wieder der `Port` aus `sshd_config`. **Wichtig:** ufw muss den Port
+freigeben (Anvil öffnet `ssh_port` automatisch), und nach dem Port-Wechsel mit
+`ssh -p <port>` neu verbinden.
+
 ---
 
 ## Kernel-Fallback (Boot-Resilienz)

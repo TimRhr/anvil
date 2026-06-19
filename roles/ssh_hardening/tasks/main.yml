@@ -68,6 +68,74 @@
   ansible.builtin.meta: flush_handlers
   tags: [ssh]
 
+# --- ssh.socket (Ubuntu 22.10+/24.04/26.04) ----------------------------------
+# Bei socket-aktiviertem SSH bestimmt ssh.socket den Listen-Port — 'Port' in
+# sshd_config wird IGNORIERT. Ein abweichender Port (ssh_port != 22) würde sonst
+# nicht greifen und aussperren. Daher die Socket auf denselben Port ausrichten.
+- name: "SSH | ssh.socket-Status ermitteln"  # noqa: command-instead-of-module
+  ansible.builtin.command: systemctl is-active ssh.socket
+  register: anvil_ssh_socket
+  changed_when: false
+  failed_when: false
+  tags: [ssh]
+
+- name: "SSH | ssh.socket auf Port {{ ssh_port }} ausrichten"
+  when:
+    - (anvil_ssh_socket.stdout | default('')) == 'active'
+    - ssh_port | int != 22
+    - not ansible_check_mode
+  tags: [ssh]
+  block:
+    - name: "SSH | Drop-in-Verzeichnis für ssh.socket anlegen"
+      ansible.builtin.file:
+        path: /etc/systemd/system/ssh.socket.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: "SSH | ssh.socket ListenStream auf konfigurierten Port setzen"
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/ssh.socket.d/10-anvil-port.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          # Anvil-managed — Port der socket-aktivierten SSH.
+          # Leeres ListenStream= setzt den geerbten Default (22) zurück,
+          # danach wird der konfigurierte Port gebunden.
+          [Socket]
+          ListenStream=
+          ListenStream={{ ssh_port }}
+      register: anvil_ssh_socket_dropin
+
+    - name: "SSH | systemd neu laden & ssh.socket auf neuen Port binden"
+      ansible.builtin.systemd_service:
+        name: ssh.socket
+        state: restarted
+        daemon_reload: true
+      when: anvil_ssh_socket_dropin is changed
+
+- name: "SSH | ssh.socket-Port-Override entfernen (Port wieder 22)"
+  ansible.builtin.file:
+    path: /etc/systemd/system/ssh.socket.d/10-anvil-port.conf
+    state: absent
+  register: anvil_ssh_socket_revert
+  when:
+    - (anvil_ssh_socket.stdout | default('')) == 'active'
+    - ssh_port | int == 22
+  tags: [ssh]
+
+- name: "SSH | ssh.socket nach Override-Entfernung neu binden"
+  ansible.builtin.systemd_service:
+    name: ssh.socket
+    state: restarted
+    daemon_reload: true
+  when:
+    - anvil_ssh_socket_revert is changed
+    - not ansible_check_mode
+  tags: [ssh]
+
 # --- Self-Test ----------------------------------------------------------------
 - name: "SSH | Self-Test: Dienst aktiv?"  # noqa: command-instead-of-module
   ansible.builtin.command: systemctl is-active ssh
@@ -101,7 +169,10 @@
   failed_when: false
   when:
     - not ansible_check_mode
-    - (anvil_ssh_active.stdout | default('')) != 'active' or (anvil_ssh_listen.state | default('')) != 'started'
+    - >-
+      (anvil_ssh_listen.state | default('')) != 'started'
+      or ((anvil_ssh_active.stdout | default('')) != 'active'
+          and (anvil_ssh_socket.stdout | default('')) != 'active')
   tags: [ssh]
 
 - name: "SSH | ✅ Gehärtet"
