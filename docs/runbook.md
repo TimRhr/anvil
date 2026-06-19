@@ -7,10 +7,30 @@ git clone <repo-url> /opt/anvil && cd /opt/anvil
 cp config/anvil.conf.example config/anvil.conf      # ADMIN_USER + eigene Pubkeys
 cp group_vars/all/vault.example.yml group_vars/all/vault.yml
 ansible-vault encrypt group_vars/all/vault.yml      # Gotify-URL/Token eintragen
-echo "DEIN-VAULT-PASSWORT" > .vault_pass && chmod 600 .vault_pass   # optional
 sudo ./bootstrap.sh --check                         # Dry-Run
 sudo ./bootstrap.sh apply                           # Härtung
 ```
+
+### Verschlüsselter Vault — Passwort bereitstellen
+
+Ist `group_vars/all/vault.yml` mit `ansible-vault` verschlüsselt, braucht jeder Lauf
+das Vault-Passwort. Drei Wege (Reihenfolge der Auswertung):
+
+```bash
+# A) Interaktiv abfragen — nichts wird gespeichert (empfohlen für mehrere Clients):
+sudo ./bootstrap.sh apply --ask-vault-pass
+
+# B) Passwort-Datei (wird automatisch genutzt, falls vorhanden):
+echo "DEIN-VAULT-PASSWORT" > .vault_pass && chmod 600 .vault_pass
+sudo ./bootstrap.sh apply
+
+# C) Explizite Datei an beliebigem Ort:
+sudo ./bootstrap.sh apply --vault-pass-file /root/.anvil-vault
+```
+
+Fehlt jede Quelle, bricht Anvil mit einem klaren Hinweis ab (statt des kryptischen
+„no vault secrets found").
+
 **Vor dem ersten produktiven Lauf:** in einer Wegwerf-VM testen und während des
 ersten Laufs eine **zweite SSH-Sitzung offen halten**.
 

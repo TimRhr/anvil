@@ -31,10 +31,13 @@ cleanup() { [[ -n "${ANVIL_TMP_VARS:-}" ]] && rm -f "$ANVIL_TMP_VARS"; return 0;
 trap cleanup EXIT
 
 # --- Standardwerte für Optionen ----------------------------------------------
-MODE="apply"            # apply | rollback | reboot | enable-timer
+MODE="apply"            # apply | rollback | reboot | enable-timer | status
 CHECK_MODE=false
 ANSIBLE_TAGS=""
 PULL_URL=""
+ASK_VAULT=false         # --ask-vault-pass: Vault-Passwort interaktiv abfragen
+VAULT_PASS_FILE=""      # --vault-pass-file: explizite Passwort-Datei
+VAULT_CMD=()            # aufgelöste ansible-vault-Argumente
 
 usage() {
   cat <<'EOF'
@@ -53,7 +56,13 @@ OPTIONEN:
   --check               Dry-Run (zeigt Änderungen, ändert nichts)
   --tags a,b,c          Nur bestimmte Bereiche (z.B. ssh,firewall,time)
   --only ROLLE          Nur eine Rolle (z.B. ssh_hardening) + preflight
+  --ask-vault-pass      Vault-Passwort interaktiv abfragen (nichts gespeichert)
+  --vault-pass-file F   Vault-Passwort aus Datei F lesen
   -h, --help            Diese Hilfe
+
+VAULT (verschlüsselte group_vars/all/vault.yml):
+  Eine Passwort-Quelle ist nötig. Reihenfolge: --ask-vault-pass > --vault-pass-file
+  > Datei ./.vault_pass (wird automatisch genutzt, falls vorhanden).
 
 BEISPIELE:
   sudo ./bootstrap.sh --check
@@ -76,6 +85,8 @@ parse_args() {
       --reboot-if-needed) MODE="reboot" ;;
       --enable-timer)     MODE="enable-timer"; PULL_URL="${2:?--enable-timer benötigt eine Repo-URL}"; shift ;;
       --status)           MODE="status" ;;
+      --ask-vault-pass)   ASK_VAULT=true ;;
+      --vault-pass-file)  VAULT_PASS_FILE="${2:?--vault-pass-file benötigt einen Pfad}"; shift ;;
       -h|--help)          usage; exit 0 ;;
       *)                  die "Unbekannte Option: $1 (siehe --help)" ;;
     esac
@@ -185,18 +196,47 @@ notify() {
   fi
 }
 
+# --- Vault-Passwort-Quelle auflösen ------------------------------------------
+# Setzt das globale Array VAULT_CMD. Bricht mit Hilfetext ab, wenn vault.yml
+# verschlüsselt ist, aber keine Passwort-Quelle vorliegt.
+resolve_vault_cmd() {
+  VAULT_CMD=()
+  local vault_file="$SCRIPT_DIR/group_vars/all/vault.yml"
+  local encrypted=false
+  if [[ -f "$vault_file" ]] && head -n1 "$vault_file" 2>/dev/null | grep -q '^[$]ANSIBLE_VAULT'; then
+    encrypted=true
+  fi
+
+  if [[ "$ASK_VAULT" == true ]]; then
+    VAULT_CMD=(--ask-vault-pass); return 0
+  fi
+  if [[ -n "$VAULT_PASS_FILE" ]]; then
+    [[ -f "$VAULT_PASS_FILE" ]] || die "Vault-Passwort-Datei nicht gefunden: $VAULT_PASS_FILE"
+    VAULT_CMD=(--vault-password-file "$VAULT_PASS_FILE"); return 0
+  fi
+  if [[ -f "$SCRIPT_DIR/.vault_pass" ]]; then
+    VAULT_CMD=(--vault-password-file "$SCRIPT_DIR/.vault_pass"); return 0
+  fi
+  if [[ "$encrypted" == true ]]; then
+    die "group_vars/all/vault.yml ist verschlüsselt, aber kein Vault-Passwort gefunden.
+  Eine der Optionen wählen:
+    • sudo $0 apply --ask-vault-pass                  (interaktiv, nichts gespeichert)
+    • echo 'DEIN-PASS' > $SCRIPT_DIR/.vault_pass && chmod 600 $SCRIPT_DIR/.vault_pass
+    • sudo $0 apply --vault-pass-file /pfad/zur/passdatei"
+  fi
+}
+
 # --- Hauptablauf: Härtung anwenden -------------------------------------------
 do_apply() {
   load_config "$CONFIG_FILE"
   ensure_ansible
+  resolve_vault_cmd
 
   ANVIL_TMP_VARS="$(mktemp /tmp/anvil-vars.XXXXXX.json)"
   build_extra_vars "$ANVIL_TMP_VARS"
 
   local -a cmd=(ansible-playbook -i "$INVENTORY" "$PLAYBOOK" -e "@$ANVIL_TMP_VARS")
-  # Word-Splitting ist hier gewollt: vault_args liefert 0 oder 2 Tokens.
-  # shellcheck disable=SC2046,SC2207
-  cmd+=($(vault_args "$SCRIPT_DIR"))
+  [[ "${#VAULT_CMD[@]}" -gt 0 ]] && cmd+=("${VAULT_CMD[@]}")
   [[ -n "$ANSIBLE_TAGS" ]] && cmd+=(--tags "$ANSIBLE_TAGS")
   if [[ "$CHECK_MODE" == true ]]; then
     cmd+=(--check --diff)
