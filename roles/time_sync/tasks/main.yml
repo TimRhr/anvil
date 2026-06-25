@@ -84,7 +84,7 @@
   when: not ansible_check_mode
   tags: [time]
 
-- name: "Time | Gotify-Warnung, wenn nicht synchron"
+- name: "Time | ntfy-Warnung, wenn nicht synchron"
   ansible.builtin.command:
     argv:
       - /usr/local/bin/anvil-notify

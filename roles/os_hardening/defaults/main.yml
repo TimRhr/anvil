@@ -92,7 +92,7 @@ os_su_group: sudo
 
 # auditd Log-Retention & Aktionen.
 # Hinweis: Aktionen sind bewusst verfügbarkeitsfreundlich (syslog statt halt/email),
-# da Anvil keinen MTA betreibt (Gotify) und ein halt einen KRITIS-Server lahmlegen
+# da Anvil keinen MTA betreibt (ntfy) und ein halt einen KRITIS-Server lahmlegen
 # würde. Für strikte CIS-L2-Konformität ggf. auf 'halt'/'single' anheben.
 auditd_max_log_file: 50            # MB pro Logdatei
 auditd_num_logs: 10

@@ -3,7 +3,7 @@
 # roles/os_hardening/tasks/attack_surface.yml — Angriffsfläche erfassen (H)
 #
 # Erfasst die aktuelle Angriffsfläche des Hosts: lauschende Sockets, aktive
-# systemd-Units, und meldet sie als Report (lokal + Gotify). Optionales
+# systemd-Units, und meldet sie als Report (lokal + ntfy). Optionales
 # Maskieren von Diensten über os_mask_services.
 #
 # Achtung: Das aggressive Maskieren unerwarteter Dienste ist BEWUSST NICHT
@@ -92,7 +92,7 @@
   when: not ansible_check_mode
   tags: [os, attack_surface]
 
-- name: "Attack | Gotify-Benachrichtigung (Zusammenfassung)"
+- name: "Attack | ntfy-Benachrichtigung (Zusammenfassung)"
   ansible.builtin.command:
     cmd: >-
       /usr/local/bin/anvil-notify

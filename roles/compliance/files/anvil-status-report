@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# anvil-status-report — wöchentlicher Sicherheitsstatus -> Gotify + Report
+# anvil-status-report — wöchentlicher Sicherheitsstatus -> ntfy + Report
 #
 # Sammelt fehlertolerant Lynis-Index (+ Trend), ausstehende Security-Updates,
 # Drift (offene Ports), fail2ban-Bans, fehlgeschlagene Dienste, Reboot-/Kernel-
@@ -94,14 +94,14 @@ fi
 
 auditd_state="$(systemctl is-active auditd 2>/dev/null || echo inactive)"
 
-# --- 6. Priorität (Gotify 0..10) ---------------------------------------------
-prio=3   # info
+# --- 6. Priorität (ntfy 1..5) ------------------------------------------------
+prio=3   # info (default)
 if [[ "$sec_updates" -gt 0 || "$failed_svc" -gt 0 || "$reboot_req" == "JA" \
       || "$trend" == "↓" || ( "$drift_uncovered" != "n/a" && "$drift_uncovered" != "(keine)" ) ]]; then
-  prio=6   # warn
+  prio=4   # warn (high)
 fi
 if [[ "$fallback" != "nein" || "$auditd_state" != "active" ]]; then
-  prio=9   # alert
+  prio=5   # alert (max/urgent)
 fi
 
 # --- 7. Bericht + Push -------------------------------------------------------

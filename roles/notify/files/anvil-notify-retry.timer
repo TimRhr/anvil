@@ -1,5 +1,5 @@
 [Unit]
-Description=Anvil — periodischer Retry für gespoolte Gotify-Nachrichten
+Description=Anvil — periodischer Retry für gespoolte ntfy-Nachrichten
 
 [Timer]
 OnBootSec=2min

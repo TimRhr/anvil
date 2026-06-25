@@ -16,7 +16,7 @@ Perspektiven: **Supply Chain**, **Angreifer/Red Team**, **Operator/Blue Team**,
 |----|-------------|--------|------------|
 | **SC-1** | Supply Chain | Der Continuous-Enforcement-Timer führt als root `git reset --hard origin/<branch>` + `bootstrap.sh apply` aus ([systemd/anvil-pull-run](../systemd/anvil-pull-run)). Wer das Repo kontrolliert (Kompromittierung, MITM des Fetch, geleakte Push-Credentials), erhält **root auf allen Servern**. Keine Commit-Signaturprüfung, kein gepinnter Stand. | **Als Restrisiko akzeptiert** (Single-Admin-/KMU-Betrieb, vertrauenswürdiges Repo — siehe [ROADMAP.md](../ROADMAP.md) Phase 4). Mitigation falls nötig: getaggten Stand pinnen, Read-only Deploy-Key, `git verify-commit`. |
 | **SE-1** | Secrets | Pull-Modell-Schwäche: `.vault_pass` liegt **auf dem Host**, dessen Secrets es schützt. Eine Host-Kompromittierung gibt alle Vault-Secrets frei (das Vault-Passwort liegt daneben). | Secrets auf dem Host minimieren; Laufzeit-Abruf aus externem Store (SOPS-age mit TPM-/`systemd-creds`-geschütztem Schlüssel, oder Vault-Server). `.vault_pass` nicht persistent ablegen. → Phase 4 |
-| **NW-1** | Netzwerk/Angreifer | Egress ist `allow` ([group_vars/all/main.yml](../group_vars/all/main.yml): `firewall_default_outgoing: allow`). Für Kronjuwelen ermöglicht das **Daten-Exfiltration und C2** ungehindert. | `default deny outgoing` + Allowlist (DNS, NTP, Paketspiegel, Gotify, ggf. Update-Proxy). → Phase 2 |
+| **NW-1** | Netzwerk/Angreifer | Egress ist `allow` ([group_vars/all/main.yml](../group_vars/all/main.yml): `firewall_default_outgoing: allow`). Für Kronjuwelen ermöglicht das **Daten-Exfiltration und C2** ungehindert. | `default deny outgoing` + Allowlist (DNS, NTP, Paketspiegel, ntfy, ggf. Update-Proxy). → Phase 2 |
 | **DT-1** | Detektion | Logs liegen nur **lokal** (Remote-Syslog ist Toggle, default aus). Ein Angreifer mit root kann auditd-/journald-Logs manipulieren/löschen. | Immutable **Remote-Logging by default** für diese Posture (rsyslog→SIEM, auditd-Remote-Plugin), möglichst WORM/append-only. → Phase 2/5 |
 | **AU-1** | Auth | SSH ist key-only (gut), aber **einfaktoriell** (Besitz des Keys). Für Kronjuwelen fehlt ein zweiter Faktor. | FIDO2-Hardwarekeys (`sk-ssh-ed25519`) erzwingen oder `publickey,keyboard-interactive` mit TOTP; Zugang nur von Bastion (`Match Address`). → Phase 2 |
 
@@ -35,7 +35,7 @@ Perspektiven: **Supply Chain**, **Angreifer/Red Team**, **Operator/Blue Team**,
 
 | ID | Perspektive | Befund | Empfehlung |
 |----|-------------|--------|------------|
-| **MI-1** | Detektion | Gotify über HTTPS, aber ohne Cert-Pinning; bei Token-Leak Alerts spoofbar/unterdrückbar. | Token rotierbar halten; optional Pinning/mTLS; Heartbeat-Alarm zur Ausfallerkennung. |
+| **MI-1** | Detektion | ntfy über HTTPS, aber ohne Cert-Pinning; bei Token-Leak Alerts spoofbar/unterdrückbar. | Token rotierbar halten; optional Pinning/mTLS; Heartbeat-Alarm zur Ausfallerkennung. |
 | **MI-2** | Qualität | Nur Molecule-Gerüst, keine automatisierten Integrationstests auf echtem 24.04/26.04. | CI-Matrix + Molecule auf beiden Versionen, Idempotenz-/Fallback-Tests. → Phase 6 |
 | **MI-3** | Härtung | Kein Kernel-`lockdown`-LSM, kein USB-Lockdown by default, AppArmor nur „enabled" (nicht flächig „enforce"). | Für Kronjuwelen: lockdown=confidentiality, usb-storage-Blacklist an, gezielt enforce. → Phase 2 |
 

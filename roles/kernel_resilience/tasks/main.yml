@@ -4,7 +4,7 @@
 #
 # Mehrschichtig: (1) Panik/Hänger erzwingen Reboot, (2) GRUB bootet headless
 # immer durch, (3) neuer Kernel nur als One-shot mit Known-Good-Fallback,
-# (4) Boot-Assessment wertet aus und alarmiert via Gotify.
+# (4) Boot-Assessment wertet aus und alarmiert via ntfy.
 # =============================================================================
 
 # --- (1) Auto-Reboot bei Panik / Hänger --------------------------------------

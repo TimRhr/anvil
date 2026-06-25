@@ -1,7 +1,8 @@
 # {{ ansible_managed }}
-# Anvil-Benachrichtigungs-Konfiguration (Gotify). Mode 0600 — enthält Token.
-GOTIFY_URL="{{ notify_gotify_url }}"
-GOTIFY_TOKEN="{{ notify_gotify_token }}"
+# Anvil-Benachrichtigungs-Konfiguration (ntfy). Mode 0600 — enthält Token.
+NTFY_SERVER="{{ notify_ntfy_server }}"
+NTFY_TOPIC="{{ notify_ntfy_topic }}"
+NTFY_TOKEN="{{ notify_ntfy_token }}"
 PRIORITY_DEFAULT="{{ notify_priority_info }}"
 APP_NAME="{{ notify_app_name }}"
 SPOOL_DIR="{{ notify_spool_dir }}"

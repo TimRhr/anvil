@@ -102,7 +102,7 @@
       ansible.builtin.systemd_service:
         daemon_reload: true
 
-    - name: "Profile | Gotify: Restart nötig"
+    - name: "Profile | ntfy: Restart nötig"
       ansible.builtin.command:
         argv:
           - /usr/local/bin/anvil-notify

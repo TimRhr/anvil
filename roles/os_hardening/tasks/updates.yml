@@ -15,7 +15,7 @@
     group: root
     mode: "0644"
 
-- name: "Updates | Gotify-Meldungsskript installieren"
+- name: "Updates | ntfy-Meldungsskript installieren"
   ansible.builtin.copy:
     src: anvil-upgrade-notify
     dest: /usr/local/sbin/anvil-upgrade-notify
@@ -39,7 +39,7 @@
     group: root
     mode: "0755"
 
-- name: "Updates | OnSuccess-Hook -> Gotify nach Upgrade-Lauf"
+- name: "Updates | OnSuccess-Hook -> ntfy nach Upgrade-Lauf"
   ansible.builtin.copy:
     src: apt-daily-upgrade-onsuccess.conf
     dest: /etc/systemd/system/apt-daily-upgrade.service.d/anvil-onsuccess.conf

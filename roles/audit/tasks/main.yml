@@ -63,7 +63,7 @@
   when: not ansible_check_mode
   tags: [audit]
 
-- name: "Audit | Ergebnis via Gotify melden"
+- name: "Audit | Ergebnis via ntfy melden"
   ansible.builtin.command:
     argv:
       - /usr/local/bin/anvil-notify

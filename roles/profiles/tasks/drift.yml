@@ -34,7 +34,7 @@
   changed_when: false
   when: not ansible_check_mode
 
-- name: "Drift | Gotify-Warnung bei ungedeckten Ports"
+- name: "Drift | ntfy-Warnung bei ungedeckten Ports"
   ansible.builtin.command:
     argv:
       - /usr/local/bin/anvil-notify

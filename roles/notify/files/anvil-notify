@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # =============================================================================
-# anvil-notify — Push-Benachrichtigung an Gotify (mit lokalem Spool/Retry)
+# anvil-notify — Push-Benachrichtigung an ntfy (mit lokalem Spool/Retry)
 #
 # Verwendung:
 #   anvil-notify [--priority N] [--title "Titel"] "Nachricht ..."
 #
-# Schlägt der Versand fehl (Gotify offline), wird die Nachricht gespoolt und
-# vom Timer anvil-notify-retry später erneut zugestellt. Der Aufrufer wird
-# NIE mit einem Fehler belastet (Exit 0), damit Hooks robust bleiben.
+# Veröffentlicht via ntfy-JSON-Publish an die Server-Root-URL
+# (Body: {"topic","title","message","priority"}). Schlägt der Versand fehl
+# (ntfy offline), wird die Nachricht gespoolt und vom Timer anvil-notify-retry
+# später erneut zugestellt. Der Aufrufer wird NIE mit einem Fehler belastet
+# (Exit 0), damit Hooks robust bleiben.
 # =============================================================================
 set -euo pipefail
 
@@ -15,9 +17,10 @@ CONF=/etc/anvil/notify.conf
 # shellcheck disable=SC1090
 [[ -r "$CONF" ]] && source "$CONF"
 
-GOTIFY_URL="${GOTIFY_URL:-}"
-GOTIFY_TOKEN="${GOTIFY_TOKEN:-}"
-PRIORITY_DEFAULT="${PRIORITY_DEFAULT:-5}"
+NTFY_SERVER="${NTFY_SERVER:-}"
+NTFY_TOPIC="${NTFY_TOPIC:-}"
+NTFY_TOKEN="${NTFY_TOKEN:-}"
+PRIORITY_DEFAULT="${PRIORITY_DEFAULT:-3}"
 APP_NAME="${APP_NAME:-Anvil}"
 SPOOL_DIR="${SPOOL_DIR:-/var/spool/anvil-notify}"
 LOG_FILE="${LOG_FILE:-/var/log/anvil/notify.log}"
@@ -38,6 +41,14 @@ message="${rest[*]:-}"
 # Hostnamen voranstellen für Kontext bei mehreren Servern.
 message="[$(hostname -s 2>/dev/null || echo host)] $message"
 
+# ntfy-Priorität ist 1..5 — defensiv clampen (falls ein Aufrufer noch die alte
+# Gotify-Skala 0..10 verwendet), damit ntfy die Nachricht nicht mit 400 ablehnt.
+case "$priority" in
+  ''|*[!0-9]*) priority="$PRIORITY_DEFAULT" ;;
+esac
+(( priority < 1 )) && priority=1
+(( priority > 5 )) && priority=5
+
 json_escape() {
   local s="$1"
   s="${s//\\/\\\\}"; s="${s//\"/\\\"}"
@@ -45,18 +56,20 @@ json_escape() {
   printf '%s' "$s"
 }
 
-body="$(printf '{"title":"%s","message":"%s","priority":%s}' \
-  "$(json_escape "$title")" "$(json_escape "$message")" "$priority")"
+body="$(printf '{"topic":"%s","title":"%s","message":"%s","priority":%s}' \
+  "$(json_escape "$NTFY_TOPIC")" "$(json_escape "$title")" \
+  "$(json_escape "$message")" "$priority")"
 
 log_line() { printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >>"$LOG_FILE" 2>/dev/null || true; }
 
 mkdir -p "$SPOOL_DIR" 2>/dev/null || true
 
 send() {
-  [[ -n "$GOTIFY_URL" && -n "$GOTIFY_TOKEN" ]] || return 1
-  curl -fsS --max-time 10 -H "Content-Type: application/json" \
-    -X POST "${GOTIFY_URL%/}/message?token=${GOTIFY_TOKEN}" \
-    --data "$1" >/dev/null 2>&1
+  [[ -n "$NTFY_SERVER" && -n "$NTFY_TOPIC" ]] || return 1
+  local -a auth=()
+  [[ -n "$NTFY_TOKEN" ]] && auth=(-H "Authorization: Bearer ${NTFY_TOKEN}")
+  curl -fsS --max-time 10 -H "Content-Type: application/json" "${auth[@]}" \
+    -X POST "${NTFY_SERVER%/}" --data "$1" >/dev/null 2>&1
 }
 
 if send "$body"; then

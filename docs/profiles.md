@@ -26,7 +26,7 @@ Lauf wieder **zurückgebaut** (Drop-in/Audit/Ingress entfernt).
 
 **Restart-Politik:** Ändert sich das Sandbox-Drop-in, wird der Dienst neu gestartet
 (Sandbox sofort aktiv). Ausnahme `container_host`: **dockerd wird nicht** automatisch
-neugestartet (würde Container stoppen) → Gotify meldet „Restart nötig".
+neugestartet (würde Container stoppen) → ntfy meldet „Restart nötig".
 
 ## Mitgelieferte Profile
 
@@ -53,7 +53,7 @@ Härtung kommt dann über die Container-Ebene.
 
 Jeder Lauf vergleicht **lauschende Nicht-loopback-Ports** (`ss -tlnH`) mit den
 **erwarteten** (SSH + `firewall_extra_rules` + Profil-Ingress). Ungedeckte Ports
-landen im Report (`/var/log/anvil/reports/drift-<datum>.txt`) und als Gotify-
+landen im Report (`/var/log/anvil/reports/drift-<datum>.txt`) und als ntfy-
 Warnung. **Es wird nichts blockiert** (`profiles_drift_detect: false` schaltet es ab).
 
 ## Eigenes Profil anlegen

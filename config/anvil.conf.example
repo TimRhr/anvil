@@ -5,7 +5,7 @@
 #   cp config/anvil.conf.example config/anvil.conf
 #
 # Diese Datei enthält NUR öffentliche Werte (Public-Keys, Toggles) und darf
-# versioniert werden. Echte Geheimnisse (Gotify-Token, GRUB-Passwort) gehören
+# versioniert werden. Echte Geheimnisse (ntfy-Token, GRUB-Passwort) gehören
 # in group_vars/all/vault.yml (ansible-vault-verschlüsselt) — NICHT hierher!
 #
 # Format: einfache Bash-Zuweisungen, wird von bootstrap.sh eingelesen.
@@ -39,7 +39,7 @@ ANVIL_SSH_MFA="auto"
 ANVIL_PROFILES=()
 
 # --- Continuous Compliance (siehe docs/runbook.md) -----------------------------
-# Wöchentlicher Selbst-Audit (Lynis) + Gotify-Statusbericht. systemd-OnCalendar-
+# Wöchentlicher Selbst-Audit (Lynis) + ntfy-Statusbericht. systemd-OnCalendar-
 # Ausdruck; leer lassen für den Default (sonntags 04:00). Abschalten des Timers:
 # in group_vars/all/main.yml compliance_schedule_enabled=false.
 ANVIL_COMPLIANCE_SCHEDULE="Sun *-*-* 04:00:00"

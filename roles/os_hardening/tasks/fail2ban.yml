@@ -1,14 +1,14 @@
 ---
-- name: "Fail2ban | Gotify-Action installieren"
+- name: "Fail2ban | ntfy-Action installieren"
   ansible.builtin.copy:
-    src: fail2ban-anvil-gotify.conf
-    dest: /etc/fail2ban/action.d/anvil-gotify.conf
+    src: fail2ban-anvil-ntfy.conf
+    dest: /etc/fail2ban/action.d/anvil-ntfy.conf
     owner: root
     group: root
     mode: "0644"
   notify: Restart fail2ban
 
-- name: "Fail2ban | jail.local deployen (sshd-Jail + Gotify)"
+- name: "Fail2ban | jail.local deployen (sshd-Jail + ntfy)"
   ansible.builtin.template:
     src: fail2ban-jail.local.j2
     dest: /etc/fail2ban/jail.local

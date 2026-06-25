@@ -8,5 +8,5 @@ admin_pubkeys:
 anvil_posture: crown_jewels
 ssh_mfa_method: auto
 notify_enabled: false
-vault_gotify_url: ""
-vault_gotify_token: ""
+vault_ntfy_server: ""
+vault_ntfy_topic: ""

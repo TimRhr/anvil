@@ -72,7 +72,7 @@
     - role: profiles
       tags: [profiles, drift]
 
-    # 12. Continuous Compliance: geplanter Selbst-Audit + Gotify-Statusbericht
+    # 12. Continuous Compliance: geplanter Selbst-Audit + ntfy-Statusbericht
     - role: compliance
       tags: [compliance]
 
@@ -82,7 +82,7 @@
       tags: [siem]
 
   post_tasks:
-    - name: "Anvil | Abschluss-Benachrichtigung (Gotify)"
+    - name: "Anvil | Abschluss-Benachrichtigung (ntfy)"
       ansible.builtin.command:
         argv:
           - /usr/local/bin/anvil-notify

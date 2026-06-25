@@ -33,7 +33,7 @@ kein formales Zertifizierungsdokument.
 | Cron-Zugriffskontrolle | `os_hardening:cron` | SYS.1.3 | 5.1 |
 | Boot-Resilienz / Kernel-Fallback | `kernel_resilience` | SYS.1.3.A2, NotfallM. | — |
 | Sicherheits-Audit (Lynis) | `audit` | DER.3 | — |
-| Benachrichtigung (Gotify) | `notify` | DER.1, OPS.1.1.5 | — |
+| Benachrichtigung (ntfy) | `notify` | DER.1, OPS.1.1.5 | — |
 | Config-Backup/Rollback | `preflight` + `bootstrap --rollback` | CON.3, OPS.1.1.4 | — |
 
 > Lücken-/Reifegrad: Mit Lynis (`audit`-Rolle) wird nach jedem Lauf ein

@@ -118,7 +118,7 @@ Schaltet `ufw` auf `deny outgoing` um, mit Allowlist für:
 | 53 | udp/tcp | DNS |
 | 123 | udp | NTP |
 | 80 | tcp | HTTP (Updates) |
-| 443 | tcp | HTTPS (Updates, Gotify) |
+| 443 | tcp | HTTPS (Updates, ntfy) |
 | 6514 | tcp | Remote-Syslog (falls aktiviert) |
 
 **Einschränkung:** Port 443/80 sind protokollagnostisch — echter
@@ -254,7 +254,7 @@ Bei **jedem** Anvil-Lauf wird ein Angriffsflächen-Report erstellt
 - Lauschende Sockets (`ss -tulpn`)
 - Aktive und fehlgeschlagene systemd-Units
 - Posture-Aktivierungen (crown-Maßnahmen)
-- Gotify-Benachrichtigung bei konfiguriertem Gotify
+- ntfy-Benachrichtigung bei konfiguriertem ntfy
 
 Optional können unerwünschte Dienste maskiert werden:
 

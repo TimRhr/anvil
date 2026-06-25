@@ -6,7 +6,7 @@
 git clone <repo-url> /opt/anvil && cd /opt/anvil
 cp config/anvil.conf.example config/anvil.conf      # ADMIN_USER + eigene Pubkeys
 cp group_vars/all/vault.example.yml group_vars/all/vault.yml
-ansible-vault encrypt group_vars/all/vault.yml      # Gotify-URL/Token eintragen
+ansible-vault encrypt group_vars/all/vault.yml      # ntfy-Server/Topic/Token eintragen
 sudo ./bootstrap.sh --check                         # Dry-Run
 sudo ./bootstrap.sh apply                           # Härtung
 ```
@@ -130,7 +130,7 @@ sudo tests/fallback-check.sh
 ```
 
 Geprüft werden drei Pfade:
-1. **Fallback-Pfad:** Bogus-Kernel → `last-fallback` geschrieben, `intended-kernel` entfernt, Gotify-Eintrag im Log.
+1. **Fallback-Pfad:** Bogus-Kernel → `last-fallback` geschrieben, `intended-kernel` entfernt, ntfy-Eintrag im Log.
 2. **Erfolgs-Pfad:** `intended-kernel == uname -r` → laufender Kernel als GRUB-Default, `intended-kernel` entfernt.
 3. **Normaler Boot:** Kein `intended-kernel` → `saved_entry` gesetzt, kein Fallback.
 
@@ -182,14 +182,14 @@ Die VM startet automatisch neu. Nach dem Boot:
 # Prüfen, ob der Fallback eingeleitet wurde:
 cat /var/lib/anvil/last-fallback          # zeigt: defekte Version -> aktuelle Version
 
-# Gotify-Alarm prüfen:
+# ntfy-Alarm prüfen:
 grep -i 'fallback\|kernel' /var/log/anvil/notify.log
 
 # Gesperrten Kernel anzeigen:
 apt-mark showhold
 ```
 
-**Erwartet:** VM bootet den alten (Known-Good) Kernel, `last-fallback` existiert, Gotify-Alarm mit `⚠️ Kernel-Fallback aktiv` ist im Log.
+**Erwartet:** VM bootet den alten (Known-Good) Kernel, `last-fallback` existiert, ntfy-Alarm mit `⚠️ Kernel-Fallback aktiv` ist im Log.
 
 ### Wiederherstellen
 
@@ -291,7 +291,7 @@ freigeben (Anvil öffnet `ssh_port` automatisch), und nach dem Port-Wechsel mit
 - **One-shot:** `anvil-prepare-kernel-reboot` bootet den neuen Kernel einmalig; der
   persistente Default bleibt der laufende (Known-Good) Kernel.
 - **Assessment:** `anvil-boot-success.service` ruft nach dem Boot `anvil-boot-assess`:
-  Erfolg → neuer Kernel wird Default; Fehlboot → Fallback auf Known-Good + **Gotify-Alarm**,
+  Erfolg → neuer Kernel wird Default; Fehlboot → Fallback auf Known-Good + **ntfy-Alarm**,
   defekter Kernel wird auf `hold` gesetzt.
 
 ### Sicher nach Kernel-Update neu starten
@@ -317,13 +317,21 @@ sudo anvil-prepare-kernel-reboot
 
 ---
 
-## Benachrichtigungen (Gotify)
+## Benachrichtigungen (ntfy)
 
-- Konfiguration: `/etc/anvil/notify.conf` (aus dem Vault).
+- Vault-Variablen (`group_vars/all/vault.yml`):
+  - `vault_ntfy_server` — Basis-URL, z.B. `https://ntfy.sh` oder self-hosted.
+  - `vault_ntfy_topic` — das Topic (schwer zu erraten wählen, da wer das Topic
+    kennt, mitlesen/-schreiben kann — bei self-hosted besser mit Access-Control).
+  - `vault_ntfy_token` — optionaler Access-Token (`tk_…`) für geschützte Topics.
+- Anvil pusht via ntfy-**JSON-Publish** an die Server-Root-URL (Body trägt das Topic);
+  Auth via `Authorization: Bearer <token>`, falls gesetzt.
+- Priorität: ntfy-Skala **1–5** (3=info, 4=warn, 5=max/urgent).
+- Konfiguration auf dem Host: `/etc/anvil/notify.conf` (Mode 0600, aus dem Vault).
 - Test: `sudo anvil-notify --priority 5 --title "Test" "Hallo von $(hostname)"`
-- Bei Gotify-Ausfall werden Nachrichten unter `/var/spool/anvil-notify/` gepuffert und
+- Bei ntfy-Ausfall werden Nachrichten unter `/var/spool/anvil-notify/` gepuffert und
   von `anvil-notify-retry.timer` (alle 5 min) erneut zugestellt.
-- Log: `/var/log/anvil/notify.log`.
+- Log: `/var/log/anvil/notify.log` (`SENT` / `SPOOLED` / `RESENT`).
 
 ---
 
@@ -346,7 +354,7 @@ sudo anvil-prepare-kernel-reboot
 ## Continuous Compliance (wöchentlicher Statusbericht)
 
 Anvil installiert einen systemd-Timer **`anvil-status.timer`**, der wöchentlich einen
-**Sicherheitsstatus** erzeugt und per **Gotify** meldet — ohne Login. Inhalt:
+**Sicherheitsstatus** erzeugt und per **ntfy** meldet — ohne Login. Inhalt:
 Lynis-Hardening-Index **+ Trend** (↑/↓/→), ausstehende Security-Updates, Drift (offene
 Ports), fail2ban-Bans, fehlgeschlagene Dienste, Reboot-/Kernel-Fallback-Status, Zeitsync,
 auditd-Status. Die Priorität eskaliert (info → warn → alert), sodass Probleme auffallen.

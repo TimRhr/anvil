@@ -156,7 +156,7 @@
   when: not ansible_check_mode
   tags: [ssh]
 
-- name: "SSH | Self-Test-Ergebnis melden (Gotify bei Problem)"
+- name: "SSH | Self-Test-Ergebnis melden (ntfy bei Problem)"
   ansible.builtin.command:
     argv:
       - /usr/local/bin/anvil-notify

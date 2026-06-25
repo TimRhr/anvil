@@ -45,7 +45,7 @@
               | combine(docker_hardening, recursive=true)) | to_nice_json }}
       register: anvil_docker_daemon_written
 
-    - name: "Docker | Gotify: dockerd-Restart nötig"
+    - name: "Docker | ntfy: dockerd-Restart nötig"
       ansible.builtin.command:
         argv:
           - /usr/local/bin/anvil-notify

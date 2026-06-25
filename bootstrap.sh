@@ -50,7 +50,7 @@ BEFEHLE:
   --rollback            Letztes Config-Backup wiederherstellen
   --reboot-if-needed    Nach Kernel-Update sicher rebooten (Kernel-Fallback aktiv)
   --enable-timer URL    Continuous Enforcement via ansible-pull aktivieren
-  --status              Sicherheitsstatus jetzt erzeugen + an Gotify senden
+  --status              Sicherheitsstatus jetzt erzeugen + an ntfy senden
 
 OPTIONEN:
   --check               Dry-Run (zeigt Änderungen, ändert nichts)
@@ -247,7 +247,7 @@ do_apply() {
 
   log "Starte: ${cmd[*]}"
   ANSIBLE_CONFIG="$SCRIPT_DIR/ansible.cfg" "${cmd[@]}" || {
-    notify 9 "Anvil fehlgeschlagen" "Härtung auf $(hostname) abgebrochen — siehe $ANVIL_LOGFILE"
+    notify 5 "Anvil fehlgeschlagen" "Härtung auf $(hostname) abgebrochen — siehe $ANVIL_LOGFILE"
     die "Ansible-Lauf fehlgeschlagen. Bei SSH-Problemen: sudo $0 --rollback"
   }
 

@@ -119,23 +119,23 @@ test_fallback_path() {
     pass "apt-mark hold für nicht-existentes Paket sauber fehlgeschlagen (erwartet)."
   fi
 
-  # 6. Prüfen: Gotify-Alarm im Notify-Log
+  # 6. Prüfen: ntfy-Alarm im Notify-Log
   sync_logs
   if [[ -f "$NOTIFY_LOG" ]]; then
     # Suche nach einem kürzlichen Eintrag mit "Kernel-Fallback" im Titel oder
-    # "SPOOLED"/"SENT" — der genaue Inhalt hängt von der Gotify-Konfiguration ab.
+    # "SPOOLED"/"SENT" — der genaue Inhalt hängt von der ntfy-Konfiguration ab.
     if grep -q "Kernel-Fallback" "$NOTIFY_LOG" 2>/dev/null; then
-      pass "Gotify-Alarm im Notify-Log gefunden (Kernel-Fallback)."
+      pass "ntfy-Alarm im Notify-Log gefunden (Kernel-Fallback)."
     elif grep -q "kernel" "$NOTIFY_LOG" 2>/dev/null; then
       # Fallback: Irgendein kernel-bezogener Eintrag wurde geloggt.
-      pass "Gotify-Eintrag im Notify-Log gefunden."
+      pass "ntfy-Eintrag im Notify-Log gefunden."
     else
-      fail "Kein Gotify-Eintrag in $NOTIFY_LOG nach Fallback-Simulation."
+      fail "Kein ntfy-Eintrag in $NOTIFY_LOG nach Fallback-Simulation."
       log "Letzte 5 Zeilen von $NOTIFY_LOG:"
       tail -5 "$NOTIFY_LOG" 2>/dev/null | sed 's/^/  /' >&2 || true
     fi
   else
-    fail "Notify-Log $NOTIFY_LOG existiert nicht — Gotify nicht installiert/konfiguriert?"
+    fail "Notify-Log $NOTIFY_LOG existiert nicht — ntfy nicht installiert/konfiguriert?"
   fi
 
   cleanup

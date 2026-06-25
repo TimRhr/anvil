@@ -1,6 +1,6 @@
 ---
 # =============================================================================
-# roles/compliance — geplanter Selbst-Audit + Gotify-Statusbericht (Phase 4)
+# roles/compliance — geplanter Selbst-Audit + ntfy-Statusbericht (Phase 4)
 #
 # Installiert das Status-Skript (immer, auch für `--status` on-demand) und einen
 # wöchentlichen systemd-Timer (wenn compliance_schedule_enabled). Ist der Timer

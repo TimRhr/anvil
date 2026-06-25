@@ -1,5 +1,5 @@
 [Unit]
-Description=Anvil — Gotify-Meldung nach unattended-upgrades
+Description=Anvil — ntfy-Meldung nach unattended-upgrades
 
 [Service]
 Type=oneshot

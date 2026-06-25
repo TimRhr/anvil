@@ -14,7 +14,7 @@ Unattended-Upgrade::Remove-Unused-Kernel-Packages "false";
 Unattended-Upgrade::Remove-Unused-Dependencies "false";
 
 {% if auto_updates_mail_disabled | bool %}
-// Kein Mailversand — Anvil benachrichtigt über Gotify (siehe apt-Hook).
+// Kein Mailversand — Anvil benachrichtigt über ntfy (siehe apt-Hook).
 {% else %}
 Unattended-Upgrade::Mail "root";
 {% endif %}

@@ -57,7 +57,7 @@ docker_restrict_published: false
 docker_published_allow: []   # Ports, die DOCKER-USER von außen zulässt
 
 # --- Continuous Compliance (Phase 4, siehe docs/runbook.md) -------------------
-# Wöchentlicher Selbst-Audit (Lynis) + Gotify-Statusbericht via systemd-Timer.
+# Wöchentlicher Selbst-Audit (Lynis) + ntfy-Statusbericht via systemd-Timer.
 compliance_schedule_enabled: true
 # systemd OnCalendar (Default: sonntags 04:00). Aus config/anvil.conf übersteuerbar.
 compliance_oncalendar: "Sun *-*-* 04:00:00"
@@ -177,16 +177,19 @@ remote_syslog_host: ""
 remote_syslog_port: 6514
 remote_syslog_protocol: tls   # tcp | tls
 
-# --- Benachrichtigungen (Gotify) ----------------------------------------------
+# --- Benachrichtigungen (ntfy) ------------------------------------------------
 notify_enabled: true
-# vault_gotify_url / vault_gotify_token kommen aus group_vars/all/vault.yml.
-notify_gotify_url: "{{ vault_gotify_url | default('') }}"
-notify_gotify_token: "{{ vault_gotify_token | default('') }}"
+# vault_ntfy_server / vault_ntfy_topic / vault_ntfy_token kommen aus
+# group_vars/all/vault.yml. server = Basis-URL (z.B. https://ntfy.sh oder
+# self-hosted), topic = ntfy-Topic, token = optionaler Access-Token (tk_…).
+notify_ntfy_server: "{{ vault_ntfy_server | default('') }}"
+notify_ntfy_topic: "{{ vault_ntfy_topic | default('') }}"
+notify_ntfy_token: "{{ vault_ntfy_token | default('') }}"
 notify_app_name: Anvil
-# Standard-Prioritäten (Gotify 0..10).
+# Standard-Prioritäten (ntfy-Skala 1..5: 3=default, 4=high, 5=max/urgent).
 notify_priority_info: 3
-notify_priority_warn: 6
-notify_priority_alert: 9
+notify_priority_warn: 4
+notify_priority_alert: 5
 notify_spool_dir: /var/spool/anvil-notify
 # Info-Push bei jedem erfolgreichen Anvil-Lauf?
 notify_on_run_success: true
@@ -221,7 +224,7 @@ fail2ban_maxretry: 5
 
 # unattended-upgrades
 auto_updates_automatic_reboot: false   # Kernel-Reboots laufen über kernel_resilience
-auto_updates_mail_disabled: true       # wir nutzen Gotify, kein Mail
+auto_updates_mail_disabled: true       # wir nutzen ntfy, kein Mail
 
 # --- Bootloader (GRUB) --------------------------------------------------------
 enable_grub_password: false

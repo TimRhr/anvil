@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Anvil — täglicher AIDE-Integritätscheck mit Gotify-Meldung bei Änderungen.
+# Anvil — täglicher AIDE-Integritätscheck mit ntfy-Meldung bei Änderungen.
 set -uo pipefail
 
 LOGDIR=/var/log/aide

@@ -1,10 +1,10 @@
 ---
 # =============================================================================
-# roles/notify — Gotify-Benachrichtigung installieren
+# roles/notify — ntfy-Benachrichtigung installieren
 # Wird früh ausgeführt, damit alle Folgeschritte (und Fehler) melden können.
 # =============================================================================
 
-- name: "Notify | curl sicherstellen (für Gotify-HTTP-Push)"
+- name: "Notify | curl sicherstellen (für ntfy-HTTP-Push)"
   ansible.builtin.apt:
     name: curl
     state: present
@@ -33,14 +33,14 @@
     - "{{ anvil_log_dir }}"
   tags: [notify]
 
-- name: "Notify | Gotify-Konfiguration ablegen (/etc/anvil/notify.conf)"
+- name: "Notify | ntfy-Konfiguration ablegen (/etc/anvil/notify.conf)"
   ansible.builtin.template:
     src: notify.conf.j2
     dest: /etc/anvil/notify.conf
     owner: root
     group: root
     mode: "0600"
-  no_log: true            # enthält den Gotify-Token
+  no_log: true            # enthält den ntfy-Token
   tags: [notify]
 
 - name: "Notify | anvil-notify installieren"
@@ -83,10 +83,10 @@
   when: not ansible_check_mode
   tags: [notify]
 
-- name: "Notify | Warnung, wenn Gotify nicht konfiguriert ist"
+- name: "Notify | Warnung, wenn ntfy nicht konfiguriert ist"
   ansible.builtin.debug:
     msg: >-
-      ⚠️ Gotify-URL/Token sind leer (group_vars/all/vault.yml). Benachrichtigungen
-      werden nur lokal protokolliert/gespoolt, bis Gotify konfiguriert ist.
-  when: notify_gotify_url | length == 0 or notify_gotify_token | length == 0
+      ⚠️ ntfy-Server/Topic sind leer (group_vars/all/vault.yml). Benachrichtigungen
+      werden nur lokal protokolliert/gespoolt, bis ntfy konfiguriert ist.
+  when: notify_ntfy_server | length == 0 or notify_ntfy_topic | length == 0
   tags: [notify]

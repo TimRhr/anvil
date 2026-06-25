@@ -1,12 +1,12 @@
 ---
-# dev-Preset: Baseline mit ALLEN Maßnahmen (inkl. Forensik), Gotify still.
+# dev-Preset: Baseline mit ALLEN Maßnahmen (inkl. Forensik), ntfy still.
 admin_user: devadmin
 admin_pubkeys:
   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDdEvDevDevDevDevDevDevDevDevDevDevDevDevDev00 dev@anvil"
 anvil_posture: baseline
 notify_enabled: false
-vault_gotify_url: ""
-vault_gotify_token: ""
+vault_ntfy_server: ""
+vault_ntfy_topic: ""
 enable_aide: true
 enable_forensics: true
 enable_auto_updates: true

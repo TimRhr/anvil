@@ -4,7 +4,7 @@
 #
 # Wird von anvil-boot-success.service spät im Boot ausgeführt:
 #   * Erfolg  (laufender == intended): neuen Kernel als Default festschreiben
-#   * Fallback (laufender != intended): Known-Good behalten + Gotify-ALARM
+#   * Fallback (laufender != intended): Known-Good behalten + ntfy-ALARM
 #   * kein One-shot offen: laufenden Kernel als Known-Good-Default sichern
 # =============================================================================
 set -uo pipefail

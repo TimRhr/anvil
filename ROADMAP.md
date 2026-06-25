@@ -20,7 +20,7 @@ Vorhanden: Pull-Bootstrap, preflight/Aussperr-Schutz + Rollback, base_user,
 ssh_hardening, firewall (ufw), time_sync (chrony/NTS), logging (journald/Retention),
 os_hardening (sysctl/Module/FS/PAM/accounts/perms/limits/shell/AppArmor/auditd/AIDE/
 fail2ban/updates/bootloader/banner/cron), **kernel_resilience** (Fallback),
-notify (Gotify), audit (Lynis). Lint sauber, idempotent.
+notify (ntfy), audit (Lynis). Lint sauber, idempotent.
 
 ---
 
@@ -70,7 +70,7 @@ Defaults aktiviert — ohne den Aussperr-/Verfügbarkeitsschutz zu opfern.
   [`docs/crown-jewels.md`](docs/crown-jewels.md). GRUB-Passwort weiterhin opt-in.
 - ☑ **Angriffsfläche (H)**: [`roles/os_hardening/tasks/attack_surface.yml`](roles/os_hardening/tasks/attack_surface.yml) —
   `ss -tulpn` + aktive systemd-Units scannen, Report nach `/var/log/anvil/reports/`,
-  Gotify-Benachrichtigung. Optionales Maskieren via `os_mask_services`. Sandboxing → Phase 3.
+  ntfy-Benachrichtigung. Optionales Maskieren via `os_mask_services`. Sandboxing → Phase 3.
 - ☑ **Doku (I)**: [`docs/crown-jewels.md`](docs/crown-jewels.md) — Posture-Übersicht,
   Maßnahmen-Doku, MFA-Enrollment, Egress-Aktivierung, Umschalt-Hinweise, Restrisiken.
 
@@ -92,7 +92,7 @@ generischer Motor [`roles/profiles`](roles/profiles). Doku: [docs/profiles.md](d
 - ☑ **Pro Overlay einheitlich**: Firewall-Ingress/Egress, AppArmor-Enforce, systemd-Sandbox-
   Drop-in (NoNewPrivileges/ProtectSystem/…), Datei-/Secret-Rechte, dienstspezifische auditd-Regeln.
 - ☑ **Diff-/Drift-bewusst**: jeder Lauf vergleicht `ss -tlnH` mit erwarteten Ports (SSH +
-  Extra + Profile) und meldet ungedeckte Dienste via Gotify + Report (**nur Meldung**).
+  Extra + Profile) und meldet ungedeckte Dienste via ntfy + Report (**nur Meldung**).
 - ☑ **Container/Workloads**: `container_host` — daemon.json-Härtung (Merge), DOCKER-USER/ufw-
   Integration (opt-in, da Docker ufw umgeht), Podman-rootless als Empfehlung; dockerd kein Auto-Restart.
 - ☑ **Re-Run-Sicherheit**: additiv/idempotent; `--tags profiles`; abgewählte Profile werden
@@ -116,7 +116,7 @@ systemd-Timer. Doku: [docs/runbook.md](docs/runbook.md#continuous-compliance-wö
 - ☑ **Geplanter Selbst-Audit**: `anvil-status.timer` (Default `Sun *-*-* 04:00`, via
   `ANVIL_COMPLIANCE_SCHEDULE` änderbar) ruft [`anvil-status-report`](roles/compliance/files/anvil-status-report)
   auf → Lynis-Index **+ Trend** (↑/↓/→) aus `/var/lib/anvil/status-history`.
-- ☑ **Voller Gotify-Statusbericht**: Lynis-Index/Trend + Security-Updates + Drift (offene
+- ☑ **Voller ntfy-Statusbericht**: Lynis-Index/Trend + Security-Updates + Drift (offene
   Ports) + fail2ban-Bans + failed services + Reboot-/Kernel-Fallback-Status + Zeitsync +
   auditd; **Priorität eskaliert** (info→warn→alert). On-demand via `bootstrap.sh --status`.
 - ☐ **OpenSCAP/CIS-Scan (optional)**: nur bei Bedarf als Zusatz zur `audit`-Rolle (HTML-Report).
@@ -124,7 +124,7 @@ systemd-Timer. Doku: [docs/runbook.md](docs/runbook.md#continuous-compliance-wö
 
 Zentrales SIEM bleibt ein **Toggle** (`enable_remote_syslog`), kein Default.
 
-**Akzeptanz:** Ein wiederkehrender Lauf liefert einen datierten Report + Gotify-Trend; manuelle
+**Akzeptanz:** Ein wiederkehrender Lauf liefert einen datierten Report + ntfy-Trend; manuelle
 Auswertung genügt.
 
 ---

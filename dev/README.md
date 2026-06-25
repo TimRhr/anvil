@@ -76,7 +76,7 @@ mind. `admin_user` + `admin_pubkeys` + `anvil_posture`).
   gegen den lokalen Host (kein versehentliches Härten des Arbeitsrechners).
 - `check` läuft lokal nur im `--check`-Modus (keine Änderungen).
 - `vars` und `lint` verändern nichts.
-- Die Presets stellen Gotify still (`notify_enabled: false`) und nutzen
+- Die Presets stellen ntfy still (`notify_enabled: false`) und nutzen
   Dummy-Keys; FIDO2/TOTP werden ohne echten Faktor **nicht** erzwungen.
 
 ## Hinweise

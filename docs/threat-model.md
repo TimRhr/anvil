@@ -24,7 +24,7 @@ Sicherheitsorganisation, sondern schafft eine reproduzierbare Baseline.
 | Unsichere Defaults im Kernel/Netzstack | sysctl-Härtung, Modul-Blacklist |
 | Veraltete, verwundbare Pakete | unattended-upgrades (Security) |
 | Verlust der Verfügbarkeit durch defektes Kernel-Update | Boot-Resilienz / Kernel-Fallback |
-| Unbemerkte sicherheitsrelevante Ereignisse | Gotify-Alarme, persistentes Logging |
+| Unbemerkte sicherheitsrelevante Ereignisse | ntfy-Alarme, persistentes Logging |
 | Falsche Zeit → fehlerhafte Logs/Zertifikate | chrony, optional NTS |
 | Fehlkonfiguration sperrt Admin aus | preflight-Checks, Config-Backup, `--rollback`, reload statt restart |
 
@@ -45,5 +45,5 @@ Sicherheitsorganisation, sondern schafft eine reproduzierbare Baseline.
   von der Provider-Konsole abhängig.
 - `os_pam_faillock` und `enable_grub_password` bergen bei Fehlkonfiguration ein
   Lockout-Risiko und sind daher standardmäßig deaktiviert.
-- Gotify-Benachrichtigungen sind nur so zuverlässig wie der Gotify-Server; bei
+- ntfy-Benachrichtigungen sind nur so zuverlässig wie der ntfy-Server; bei
   längeren Ausfällen greift der lokale Spool/Retry.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Anvil — Gotify-Meldung nach einem unattended-upgrades-Lauf.
+# Anvil — ntfy-Meldung nach einem unattended-upgrades-Lauf.
 set -uo pipefail
 
 LOG=/var/log/unattended-upgrades/unattended-upgrades.log

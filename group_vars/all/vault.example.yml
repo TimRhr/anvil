@@ -11,11 +11,15 @@
 # nutzt es dann automatisch. .vault_pass NIEMALS committen!
 # =============================================================================
 
-# --- Gotify-Benachrichtigungen ------------------------------------------------
-# Basis-URL des Gotify-Servers (ohne abschließenden Slash).
-vault_gotify_url: "https://gotify.example.com"
-# Application-Token (in Gotify pro App erzeugt).
-vault_gotify_token: "AxxxxxxxxxxxxxX"
+# --- ntfy-Benachrichtigungen --------------------------------------------------
+# Basis-URL des ntfy-Servers (ohne abschließenden Slash), z.B. https://ntfy.sh
+# oder deine self-hosted Instanz.
+vault_ntfy_server: "https://ntfy.example.com"
+# ntfy-Topic, an das gepusht wird (frei wählbar — schwer zu erraten wählen!).
+vault_ntfy_topic: "anvil-alerts-xxxxxxxx"
+# Optionaler Access-Token (tk_…) für zugriffsgeschützte Topics. Leer lassen,
+# wenn das Topic öffentlich/ohne Auth erreichbar ist.
+vault_ntfy_token: ""
 
 # --- GRUB-Bootloader-Passwort (nur wenn enable_grub_password=true) ------------
 # Klartext-Passwort; Anvil erzeugt daraus den PBKDF2-Hash für grub.cfg.

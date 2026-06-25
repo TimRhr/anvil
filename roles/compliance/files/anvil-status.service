@@ -1,5 +1,5 @@
 [Unit]
-Description=Anvil — Sicherheitsstatus-Bericht (Lynis + Metriken -> Gotify)
+Description=Anvil — Sicherheitsstatus-Bericht (Lynis + Metriken -> ntfy)
 Documentation=https://example.invalid/anvil
 After=network-online.target
 Wants=network-online.target

@@ -20,8 +20,8 @@ installiert Ansible und führt die Härtung gegen `localhost` aus.
 | **Zeit** | chrony mit mehreren Quellen, optional NTS (authentifizierte Zeit), Sync-Monitoring. |
 | **Logging** | journald persistent, logrotate, auditd-Retention, optional Remote-Syslog. |
 | **OS-Hardening** | sysctl, Kernel-Module, Mount-Optionen, PAM, Account-/Dateirechte, AppArmor, auditd, AIDE, fail2ban, unattended-upgrades. |
-| **Boot-Resilienz** | Defektes Kernel-Update → automatischer Fallback auf den letzten funktionierenden Kernel + Gotify-Alarm. |
-| **Benachrichtigung** | **Gotify** (HTTP-Push) für AIDE, fail2ban, Updates, Kernel-Fallback und Anvil-Läufe. |
+| **Boot-Resilienz** | Defektes Kernel-Update → automatischer Fallback auf den letzten funktionierenden Kernel + ntfy-Alarm. |
+| **Benachrichtigung** | **ntfy** (HTTP-Push) für AIDE, fail2ban, Updates, Kernel-Fallback und Anvil-Läufe. |
 | **Audit** | Lynis-Report + Compliance-Zusammenfassung. |
 
 ---
@@ -37,7 +37,7 @@ cd /opt/anvil
 cp config/anvil.conf.example config/anvil.conf
 $EDITOR config/anvil.conf
 
-# 3. Secrets (Gotify-URL/Token, optional GRUB-Passwort) in den Vault:
+# 3. Secrets (ntfy-Server/Topic/Token, optional GRUB-Passwort) in den Vault:
 cp group_vars/all/vault.example.yml group_vars/all/vault.yml
 ansible-vault encrypt group_vars/all/vault.yml      # Passwort vergeben
 #  -> Passwort optional in ./.vault_pass ablegen (chmod 600), wird automatisch genutzt
@@ -84,7 +84,7 @@ Feature-Toggles stehen in [group_vars/all/main.yml](group_vars/all/main.yml) und
 - Ubuntu 24.04/26.04
 - root- bzw. sudo-Zugang
 - Netzwerkzugang für die **einmalige** Ansible-Installation (danach läuft alles lokal/offline)
-- Erreichbarer Gotify-Server für Benachrichtigungen (optional, aber empfohlen)
+- Erreichbarer ntfy-Server für Benachrichtigungen (optional, aber empfohlen)
 
 > Ubuntu 24.04 und 26.04 werden aktiv getestet. Debian 11/12 und Ubuntu 20.04/22.04
 > werden als kompatibel geführt, aber nicht regelmäßig in CI geprüft. Siehe
